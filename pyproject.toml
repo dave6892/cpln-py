@@ -8,6 +8,7 @@ authors = [
 dependencies = [
     "python-dotenv>=1.0.1",
     "requests>=2.32.3",
+    "ipython>=8.25.0",
 ]
 requires-python = ">=3.12"
 readme = "README.md"

@@ -1,8 +1,12 @@
 from .config import APIConfig
+from .gvc import GVCApiMixin
 import requests
 
 
-class APIClient(requests.Session):
+class APIClient(
+    requests.Session,
+    GVCApiMixin,
+):
     def __init__(self,
         config: APIConfig | None = None,
         **kwargs
