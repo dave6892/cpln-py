@@ -1,21 +1,28 @@
 from .config import APIConfig
-from ..utils.requests import make_request
+import requests
 
 
-class APIClient:
+class APIClient(requests.Session):
     def __init__(self,
         config: APIConfig | None = None,
         **kwargs
     ):
+        super().__init__()
         if config is None:
             config = APIConfig(**kwargs)
 
         self.config = config
-
-    def request(self):
-        return make_request(
-            "gvc",
-            token = self.config.token,
-            base_url=self.config.org_url,
-            request_method="GET",
+    
+    def _get(self,
+        endpoint: str
+    ):
+        return self.get(
+            f"{self.config.org_url}/{endpoint}",
+            headers = self._headers
         )
+
+    @property
+    def _headers(self):
+        return {
+            "Authorization": f"Bearer {self.config.token}"
+        }

@@ -54,5 +54,3 @@ class CPLNClient:
             >>> client = cpln.from_env()
         """
         return cls(**kwargs_from_env(**kwargs))
-    
-
