@@ -17,8 +17,7 @@ class Model:
             self.attrs = {}
 
     def __repr__(self):
-        # return f"<{self.__class__.__name__}: {self.short_id}>"
-        return f"<{self.__class__.__name__}>"
+        return f"<{self.__class__.__name__}: {self.short_id}>"
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.id == other.id

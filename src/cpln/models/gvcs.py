@@ -2,7 +2,7 @@ from .resource import Collection, Model
 
 
 class GVC(Model):
-    pass
+    id_attribute = "id"
 
 
 class GVCCollection(Collection):
