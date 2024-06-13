@@ -1,0 +1,21 @@
+[project]
+name = "cpln-py"
+version = "0.1.0"
+description = "A Python library for the Control Plane API"
+authors = [
+    {name = "dave6892", email = "dave6892@gmail.com"},
+]
+dependencies = [
+    "python-dotenv>=1.0.1",
+]
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.pdm]
+distribution = true
