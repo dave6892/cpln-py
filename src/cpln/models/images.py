@@ -4,11 +4,11 @@ from .resource import Collection, Model
 class Image(Model):
 
     def get(self) -> dict[str, any]:
-        return self.client.api.get_image(self.attrs["id"])["items"]
+        return self.client.api.get_image(self.attrs["name"])
 
     def delete(self) -> None:
         print(f"Deleting Image: {self}")
-        self.client.api.delete_image(self.attrs["id"])
+        self.client.api.delete_image(self.attrs["name"])
         print("Deleted!")
 
 

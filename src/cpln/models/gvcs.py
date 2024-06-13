@@ -4,7 +4,7 @@ from .resource import Collection, Model
 class GVC(Model):
 
     def get(self) -> dict[str, any]:
-        return self.client.api.get_gvc(self.attrs["name"]).json()
+        return self.client.api.get_gvc(self.attrs["name"])
 
     def create(self) -> None:
         print(f"Creating GVC: {self}")
