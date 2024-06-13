@@ -2,7 +2,6 @@ from .resource import Collection, Model
 
 
 class GVC(Model):
-    id_attribute = "id"
 
     def get(self) -> dict[str, any]:
         return self.client.api.get_gvc(self.attrs["name"]).json()
