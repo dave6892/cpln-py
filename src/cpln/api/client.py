@@ -16,7 +16,7 @@ class APIClient(
             config = APIConfig(**kwargs)
 
         self.config = config
-    
+
     def _get(self,
         endpoint: str
     ):

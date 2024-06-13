@@ -55,7 +55,7 @@ class CPLNClient:
             >>> client = cpln.from_env()
         """
         return cls(**kwargs_from_env(**kwargs))
-    
+
     @property
     def gvcs(self):
         return GVCCollection(client=self)
