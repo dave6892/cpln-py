@@ -25,6 +25,14 @@ class APIClient(
             headers = self._headers
         )
 
+    def _delete(self,
+        endpoint: str
+    ):
+        return self.delete(
+            f"{self.config.org_url}/{endpoint}",
+            headers = self._headers
+        )
+
     @property
     def _headers(self):
         return {
