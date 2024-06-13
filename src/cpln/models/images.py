@@ -16,8 +16,9 @@ class ImageCollection(Collection):
     model = Image
 
     def get(self, image_id: str):
-        resp = self.prepare_model(self.client.api.get_image(image_id))
-        return resp
+        return self.prepare_model(
+            self.client.api.get_image(image_id)
+        )
 
     def list(self):
         resp = self.client.api.get_image()["items"]
