@@ -7,6 +7,7 @@ def kwargs_from_env(environment=None):
         environment = os.environ
     base_url = environment.get('CPLN_URL')
     token = environment.get('CPLN_TOKEN')
+    org = environment.get('CPLN_ORG')
 
     params = {}
     if base_url:
@@ -14,5 +15,8 @@ def kwargs_from_env(environment=None):
 
     if token:
         params['token'] = token
+
+    if org:
+        params['org'] = org
 
     return params
