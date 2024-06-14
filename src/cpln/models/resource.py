@@ -3,6 +3,7 @@ class Model:
     A base class for representing a single object on the server.
     """
     id_attribute = 'id'
+    label_attribute = 'name'
 
     def __init__(self, attrs=None, client=None, collection=None, state=None):
         #: A client pointing at the server that this object is on.
@@ -22,7 +23,7 @@ class Model:
             self.attrs = {}
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: {self.short_id}>"
+        return f"<{self.__class__.__name__}: {self.short_id} - {self.label}>"
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.id == other.id
@@ -43,6 +44,13 @@ class Model:
         The ID of the object, truncated to 12 characters.
         """
         return self.id[:12]
+
+    @property
+    def label(self):
+        """
+        The label of the object.
+        """
+        return self.attrs.get(self.label_attribute)
 
     def reload(self):
         """
