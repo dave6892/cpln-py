@@ -4,12 +4,17 @@ class Model:
     """
     id_attribute = 'id'
 
-    def __init__(self, attrs=None, client=None, collection=None):
+    def __init__(self, attrs=None, client=None, collection=None, state=None):
         #: A client pointing at the server that this object is on.
         self.client = client
 
         #: The collection that this model is part of.
         self.collection = collection
+
+        #: The state that represents this model.
+        self.state = state
+        if self.state is None:
+            self.state = {}
 
         #: The raw representation of this object from the API
         self.attrs = attrs
@@ -73,15 +78,16 @@ class Collection:
     def create(self, attrs=None):
         raise NotImplementedError
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs, state=None):
         """
         Create a model from a set of attributes.
         """
         if isinstance(attrs, Model):
             attrs.client = self.client
             attrs.collection = self
+            attrs.state = state
             return attrs
         elif isinstance(attrs, dict):
-            return self.model(attrs=attrs, client=self.client, collection=self)
+            return self.model(attrs=attrs, client=self.client, collection=self, state=state)
         else:
             raise Exception(f"Can't create {self.model.__name__} from {attrs}")

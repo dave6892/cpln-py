@@ -1,7 +1,8 @@
 from .api import APIClient
 from .models import (
     GVCCollection,
-    ImageCollection
+    ImageCollection,
+    WorkloadCollection
 )
 from .utils import kwargs_from_env
 
@@ -66,5 +67,10 @@ class CPLNClient:
     @property
     def images(self):
         return ImageCollection(client=self)
+
+    @property
+    def workloads(self):
+        return WorkloadCollection(client=self)
+
 
 from_env = CPLNClient.from_env

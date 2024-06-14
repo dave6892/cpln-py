@@ -1,4 +1,7 @@
-from .resource import Collection, Model
+from .resource import (
+    Collection,
+    Model
+)
 
 
 class Image(Model):
