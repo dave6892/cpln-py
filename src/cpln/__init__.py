@@ -1,1 +1,1 @@
-from .client import CPLNClient
+from .client import CPLNClient, from_env

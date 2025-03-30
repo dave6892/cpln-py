@@ -1,11 +1,15 @@
 from .config import APIConfig
 from .gvc import GVCApiMixin
+from .image import ImageApiMixin
+from .workload import WorkloadApiMixin
 import requests
 
 
 class APIClient(
     requests.Session,
     GVCApiMixin,
+    ImageApiMixin,
+    WorkloadApiMixin,
 ):
     def __init__(self,
         config: APIConfig | None = None,
@@ -20,10 +24,11 @@ class APIClient(
     def _get(self,
         endpoint: str
     ):
-        return self.get(
+        resp = self.get(
             f"{self.config.org_url}/{endpoint}",
             headers = self._headers
         )
+        return resp.json()
 
     def _delete(self,
         endpoint: str

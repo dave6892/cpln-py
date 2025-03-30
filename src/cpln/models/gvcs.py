@@ -2,10 +2,9 @@ from .resource import Collection, Model
 
 
 class GVC(Model):
-    id_attribute = "id"
 
     def get(self) -> dict[str, any]:
-        return self.client.api.get_gvc(self.attrs["name"]).json()
+        return self.client.api.get_gvc(self.attrs["name"])
 
     def create(self) -> None:
         print(f"Creating GVC: {self}")
@@ -25,8 +24,10 @@ class GVCCollection(Collection):
     model = GVC
 
     def get(self, name: str):
-        return self.prepare_model(self.client.api.get_gvc(name).json())
+        return self.prepare_model(
+            self.client.api.get_gvc(name)
+        )
 
     def list(self):
-        resp = self.client.api.get_gvc()
-        return [self.get(gvc["name"]) for gvc in resp.json()["items"]]
+        resp = self.client.api.get_gvc()["items"]
+        return [self.get(gvc["name"]) for gvc in resp]
