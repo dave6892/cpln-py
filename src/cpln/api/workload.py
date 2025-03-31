@@ -94,6 +94,5 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
             pod = replicas[-1],
             command = command,
         )
-        print(request)
         websocket_api = WebSocketAPI(remote_wss)
         return websocket_api.exec(**request)

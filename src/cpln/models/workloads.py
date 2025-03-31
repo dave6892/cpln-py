@@ -24,17 +24,17 @@ class Workload(Model):
             location=location
         )
 
-    def get_remote(self, location: Optional[str] = None):
+    def get_remote(self, location: Optional[str] = None) -> str:
         return self.client.api.get_remote(self.config(location=location))
 
-    def get_remote_wss(self, location: Optional[str] = None):
+    def get_remote_wss(self, location: Optional[str] = None) -> str:
         return self.client.api.get_remote_wss(self.config(location=location))
 
-    def get_replicas(self, location: Optional[str] = None):
+    def get_replicas(self, location: Optional[str] = None) -> list[str]:
         return self.client.api.get_replicas(self.config(location=location))
 
 
-    def get_containers(self, location: Optional[str] = None):
+    def get_containers(self, location: Optional[str] = None) -> list[str]:
         return self.client.api.get_containers(self.config(location=location))
 
 
@@ -54,7 +54,7 @@ class WorkloadCollection(Collection):
     def list(self,
         gvc: Optional[str] = None,
         config: Optional[WorkloadConfig] = None
-    ):
+    ) -> list[Workload]:
         if gvc is None and config is None:
             raise ValueError("Either GVC or WorkloadConfig must be defined.")
 
