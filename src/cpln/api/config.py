@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 @dataclass
 class APIConfig:
@@ -12,3 +12,6 @@ class APIConfig:
 
     def get_org_url(self) -> str:
         return f"{self.base_url}/org/{self.org}"
+
+    def asdict(self):
+        return asdict(self)

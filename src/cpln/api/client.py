@@ -1,7 +1,10 @@
 from .config import APIConfig
 from .gvc import GVCApiMixin
 from .image import ImageApiMixin
-from .workload import WorkloadApiMixin
+from .workload import (
+    WorkloadApiMixin,
+    WorkloadDeploymentMixin,
+)
 import requests
 
 
@@ -10,6 +13,7 @@ class APIClient(
     GVCApiMixin,
     ImageApiMixin,
     WorkloadApiMixin,
+    WorkloadDeploymentMixin,
 ):
     def __init__(self,
         config: APIConfig | None = None,
