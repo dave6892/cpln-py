@@ -28,7 +28,7 @@ class CPLNClient:
         Return a client configured from environment variables.
 
         The environment variables used are the same as those used by the
-        Docker command-line client. They are:
+        cpln command-line client. They are:
 
         .. envvar:: CPLN_URL
 
