@@ -30,10 +30,6 @@ class CPLNClient:
         The environment variables used are the same as those used by the
         cpln command-line client. They are:
 
-        .. envvar:: CPLN_URL
-
-            The URL to the Control Plane server.
-
         .. envvar:: CPLN_TOKEN
 
             Authorization token for accessing the use of the API.
