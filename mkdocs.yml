@@ -12,4 +12,8 @@ plugins:
 nav:
   # - Home: index.md
   - Client: client.md
+  - GVCs: gvcs.md
+  - Images: images.md
+  - Workloads: workloads.md
+
 theme: readthedocs

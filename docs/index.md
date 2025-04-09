@@ -28,7 +28,7 @@ There are two variables required in the project `.env` file
 
 - `CPLN_TOKEN`: The API access key.
 
-- `CPLN_ORG`: The `ORG` of your control plane service.
+- `CPLN_ORG`: The organization namespace of your control plane service.
 
 ### Starting of example
 To connect to the Control Plane API, you must first instantiate a client. You can do this by using the `CPLNClient` class:
