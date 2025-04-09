@@ -15,5 +15,12 @@ nav:
   - GVCs: gvcs.md
   - Images: images.md
   - Workloads: workloads.md
+  - Library API: api.md
+  - Tutorial: tutorials/index.md
+    # - tutorials/gettingstarted.md
+  - Change Log: change-log.md
+  # - Contributing: contributing.md
+  # - License: license.md
+  # - Support: support.md
 
 theme: readthedocs
