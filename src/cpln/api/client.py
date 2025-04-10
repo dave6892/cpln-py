@@ -15,6 +15,23 @@ class APIClient(
     WorkloadApiMixin,
     WorkloadDeploymentMixin,
 ):
+    """
+    A low-level client for the Control Plane API.
+
+    Example:
+
+        >>> import cpln
+        >>> client = cpln.APIClient(
+            base_url='https://api.cpln.io/'
+        )
+        >>> client.version()
+
+    Args:
+        base_url (str): URL to the Control Plane server.
+        version (str): The version of the API to use. Set to ``auto`` to
+            automatically detect the server's version. Default: ``1.0.0``
+        timeout (int): Default timeout for API calls, in seconds.
+    """
     def __init__(self,
         config: APIConfig | None = None,
         **kwargs

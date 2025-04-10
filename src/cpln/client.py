@@ -19,6 +19,8 @@ class CPLNClient:
 
     Args:
         base_url (str): URL to the Control Plane server.
+        org (str): The orgnanization namespace of your control plane service.
+        token (str): Authorization token for accessing the use of the API.
     """
 
     def __init__(self, *args, **kwargs):
