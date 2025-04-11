@@ -1,26 +1,36 @@
 [project]
 name = "cpln-py"
-version = "0.1.0"
+version = "0.1.6"
 description = "A Python library for the Control Plane API"
 authors = [
     {name = "dave6892", email = "dave6892@gmail.com"},
 ]
+readme = "README.md"
+license = { text = "Apache License 2.0" }
+classifiers = [
+	"Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+requires-python = "<3.13,>=3.9"
+
 dependencies = [
     "python-dotenv>=1.0.1",
     "requests>=2.32.3",
-    "ipython>=8.25.0",
     "websocket-client>=1.8.0",
-    "mkdocs>=1.6.1",
-    "mkdocstrings[python]>=0.29.1",
 ]
-requires-python = ">=3.12"
-readme = "README.md"
-license = {text = "MIT"}
 
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=62", "wheel"]
 build-backend = "setuptools.build_meta"
-
 
 [tool.pdm]
 distribution = true
+
+[dependency-groups]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocstrings[python]>=0.29.1",
+]
