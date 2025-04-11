@@ -34,3 +34,7 @@ docs = [
     "mkdocs>=1.6.1",
     "mkdocstrings[python]>=0.29.1",
 ]
+lint = [
+    "flake8>=7.2.0",
+    "black>=25.1.0",
+]
