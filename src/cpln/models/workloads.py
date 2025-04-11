@@ -162,10 +162,12 @@ class WorkloadCollection(Collection):
 
         config = WorkloadConfig(gvc=gvc) if gvc else config
         resp = self.client.api.get_workload(config)["items"]
-        return [
-            self.get(config=WorkloadConfig(
-                gvc=config.gvc,
-                workload_id=workload["name"]
-            ))
+        return {
+            workload["name"]: self.get(
+                config=WorkloadConfig(
+                    gvc=config.gvc,
+                    workload_id=workload["name"]
+                )
+            )
             for workload in resp
-        ]
+        }

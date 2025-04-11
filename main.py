@@ -22,5 +22,8 @@ for image in client.images.list():
 gvc = 'apalis-dev'
 print()
 print(f"Workload in my control plane GVC {gvc}:")
-for workload in client.workloads.list(gvc):
+for workload in (workloads:=client.workloads.list(gvc)):
     print(workload)
+
+
+print(workloads["insurance-api-standard"])
