@@ -55,6 +55,36 @@ class Workload(Model):
         print(f"{'' if state else 'Un'}Suspending Workload: {self}")
         return tmp
 
+    def exec(self, command: str, location: str):
+        """
+        Execute a command on the workload.
+
+        Args:
+            command (str): The command to execute.
+
+        Returns:
+            (dict): The response from the server.
+        """
+        return self.client.api.exec_workload(
+            config=self.config(location=location),
+            command=command
+        )
+
+    def ping(self, location: Optional[str] = None) -> dict[str, any]:
+        """
+        Ping the workload.
+
+        Args:
+            location (str): The location of the workload.
+                Default: None
+        Returns:
+            (dict): The response from the server.
+        """
+        return self.exec(
+            ["echo", "ping"],
+            location=location,
+        )
+
 
     def config(self, location: Optional[str] = None) -> WorkloadConfig:
         """

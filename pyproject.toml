@@ -1,6 +1,6 @@
 [project]
 name = "cpln-py"
-version = "0.1.9"
+version = "0.1.10"
 description = "A Python library for the Control Plane API"
 authors = [
     {name = "dave6892", email = "dave6892@gmail.com"},
