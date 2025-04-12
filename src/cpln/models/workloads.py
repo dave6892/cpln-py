@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 from .resource import (
     Collection,
@@ -24,7 +25,7 @@ class Workload(Model):
             :py:class:`cpln.errors.APIError`
                 If the server returns an error.
         """
-        return self.client.api.get_workload(self.config)
+        return self.client.api.get_workload(self.config())
 
     def delete(self) -> None:
         """
@@ -35,8 +36,25 @@ class Workload(Model):
                 If the server returns an error.
         """
         print(f"Deleting Workload: {self}")
-        self.client.api.delete_workload(self.config)
+        self.client.api.delete_workload(self.config())
         print("Deleted!")
+
+    def suspend(self,
+        state: bool = True
+    ) -> None:
+        tmp = self.client.api.patch_workload(
+            config=self.config(),
+            data={
+                "spec": {
+                    "defaultOptions": {
+                        "suspend": str(state).lower()
+                    }
+                }
+            }
+        )
+        print(f"{'' if state else 'Un'}Suspending Workload: {self}")
+        return tmp
+
 
     def config(self, location: Optional[str] = None) -> WorkloadConfig:
         """
