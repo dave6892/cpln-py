@@ -28,7 +28,10 @@ for workload in (workloads:=client.workloads.list(gvc)):
 
 workload_name = "insurance-api-standard"
 print(workloads[workload_name])
-(tmp:=workloads[workload_name].suspend(True))
-print(tmp._content)
-print(tmp)
+# (tmp:=workloads[workload_name].suspend(True))
+# print(tmp._content)
+# print(tmp)
+
+# print(workloads[workload_name].exec(["echo", "ping"], location="aws-us-west-2"))
+workloads[workload_name].ping(location="aws-us-west-2")
 # print(tmp.__dict__)
