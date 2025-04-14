@@ -2,21 +2,29 @@ name: Python package
 
 on:
   workflow_dispatch:
-  # push:
-  #   tags:
-  #     - '*'
+    inputs:
+      release_name:
+        description: 'Release name'
+        required: true
+        default: 'v0.0.1'
+  push:
+    tags:
+      - '*'
+
+env:
+  # tag_name: ${{ github.event.ref }}
+  tag_name: ${{ github.ref_name }}
+  # release_name: ${{ inputs.release_name && inputs.release_name || github.event.inputs.release_name }}
 
 jobs:
 
   build:
 
     runs-on: ubuntu-latest
-    # strategy:
-    #   matrix:
-    #     python-version: ["3.9", "3.10", "3.11","3.12", "3.13"]
+
     steps:
       - uses: actions/checkout@v4
-      # Install PDM
+
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
@@ -27,9 +35,11 @@ jobs:
         with:
           python-version: 3.12
           cache-dependency-path: pdm.lock
+
       - name: Install Dependencies
         run: |
           pdm sync -d
+
       - name: Build package
         run: |
           pdm build
@@ -38,18 +48,9 @@ jobs:
         run: |
           gh release create "${{ env.tag_name }}" dist/* \
               --repo="$GITHUB_REPOSITORY" \
-              --title="${{ env.release_name }}" \
+              --title="${{ env.tag_name }}" \
               --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
-          tag_name: v0.0.1
-          release_name: v0.0.1
-
-      # - name: Publish package
-      #   env:
-      #     PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      #     TWINE_USERNAME: __token__
-      #     TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      #   run: |
-      #     pdm add twine && \
-      #     pdm run twine upload --repository-url https://api.github.com/orgs/${{ github.repository_owner }}/packages/pypi/upload dist/*
+          # tag_name: ${{ env.tag_name }}
+          # release_name: ${{ env.release_name }}
