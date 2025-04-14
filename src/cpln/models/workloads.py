@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 from .resource import (
     Collection,
@@ -24,7 +25,7 @@ class Workload(Model):
             :py:class:`cpln.errors.APIError`
                 If the server returns an error.
         """
-        return self.client.api.get_workload(self.config)
+        return self.client.api.get_workload(self.config())
 
     def delete(self) -> None:
         """
@@ -35,8 +36,55 @@ class Workload(Model):
                 If the server returns an error.
         """
         print(f"Deleting Workload: {self}")
-        self.client.api.delete_workload(self.config)
+        self.client.api.delete_workload(self.config())
         print("Deleted!")
+
+    def suspend(self,
+        state: bool = True
+    ) -> None:
+        tmp = self.client.api.patch_workload(
+            config=self.config(),
+            data={
+                "spec": {
+                    "defaultOptions": {
+                        "suspend": str(state).lower()
+                    }
+                }
+            }
+        )
+        print(f"{'' if state else 'Un'}Suspending Workload: {self}")
+        return tmp
+
+    def exec(self, command: str, location: str):
+        """
+        Execute a command on the workload.
+
+        Args:
+            command (str): The command to execute.
+
+        Returns:
+            (dict): The response from the server.
+        """
+        return self.client.api.exec_workload(
+            config=self.config(location=location),
+            command=command
+        )
+
+    def ping(self, location: Optional[str] = None) -> dict[str, any]:
+        """
+        Ping the workload.
+
+        Args:
+            location (str): The location of the workload.
+                Default: None
+        Returns:
+            (dict): The response from the server.
+        """
+        return self.exec(
+            ["echo", "ping"],
+            location=location,
+        )
+
 
     def config(self, location: Optional[str] = None) -> WorkloadConfig:
         """
@@ -162,10 +210,12 @@ class WorkloadCollection(Collection):
 
         config = WorkloadConfig(gvc=gvc) if gvc else config
         resp = self.client.api.get_workload(config)["items"]
-        return [
-            self.get(config=WorkloadConfig(
-                gvc=config.gvc,
-                workload_id=workload["name"]
-            ))
+        return {
+            workload["name"]: self.get(
+                config=WorkloadConfig(
+                    gvc=config.gvc,
+                    workload_id=workload["name"]
+                )
+            )
             for workload in resp
-        ]
+        }

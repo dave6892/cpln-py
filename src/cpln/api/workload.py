@@ -79,6 +79,14 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
         endpoint = f'gvc/{config.gvc}/workload/{config.workload_id}'
         return self._delete(endpoint)
 
+    def patch_workload(self,
+        config: WorkloadConfig,
+        data: dict[str, Any]
+    ):
+        """Patch a workload by its ID."""
+        endpoint = f'gvc/{config.gvc}/workload/{config.workload_id}'
+        return self._patch(endpoint, data=data)
+
     def exec_workload(self,
         config: WorkloadConfig,
         command: str
@@ -92,7 +100,7 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
             gvc = config.gvc,
             container = containers[-1],
             pod = replicas[-1],
-            command = command,
+            command = command.split(' ') if isinstance(command, str) else command,
         )
         websocket_api = WebSocketAPI(remote_wss)
         return websocket_api.exec(**request)

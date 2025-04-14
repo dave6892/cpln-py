@@ -1,12 +1,11 @@
 import cpln
+from cpln.errors import APIError
+
 
 client = cpln.from_env()
 client = cpln.CPLNClient(
     token=client.api.config.token,
     org=client.api.config.org,
-    # base_url=client.api.config.base_url,
-    # version=client.api.config.version,
-    # timeout=client.api.config.timeout,
 )
 print(client)
 
@@ -22,5 +21,25 @@ for image in client.images.list():
 gvc = 'apalis-dev'
 print()
 print(f"Workload in my control plane GVC {gvc}:")
-for workload in client.workloads.list(gvc):
+for workload in (workloads:=client.workloads.list(gvc)):
     print(workload)
+
+
+workload_name = "insurance-api-standard"
+workloads[workload_name].suspend(False) # unsuspending the workload
+
+while True:
+    try:
+        workloads[workload_name].ping(location="aws-us-west-2")
+        print(f"Workload (workloads{[workload_name]}) is up and running!")
+        break
+    except APIError as e:
+        print("Retrying...")
+        continue
+
+workloads[workload_name].exec(
+    command="echo hello world",
+    location="aws-us-west-2",
+)
+
+workloads[workload_name].suspend(True)

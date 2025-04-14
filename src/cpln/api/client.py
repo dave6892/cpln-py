@@ -59,6 +59,16 @@ class APIClient(
             headers = self._headers
         )
 
+    def _patch(self,
+        endpoint: str,
+        data: dict[str, any] | None = None
+    ):
+        return self.patch(
+            f"{self.config.org_url}/{endpoint}",
+            json = data,
+            headers = self._headers,
+        )
+
     @property
     def _headers(self):
         return {
