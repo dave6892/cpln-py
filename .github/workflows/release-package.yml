@@ -2,32 +2,11 @@ name: Python package
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '*'
+  # push:
+  #   tags:
+  #     - '*'
 
 jobs:
-  # create-release:
-  #   name: Create Release
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout branch "master"
-  #       uses: actions/checkout@v4
-  #       with:
-  #         ref: 'develop'
-
-  #     - name: Create release
-  #       run: |
-  #         gh release create "${{ env.tag_name }}" \
-  #             --repo="$GITHUB_REPOSITORY" \
-  #             --title="${{ env.release_name }}" \
-  #             --generate-notes \
-  #             --prerelease
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         tag_name: v0.0.1
-  #         release_name: v0.0.1
 
   build:
 
@@ -60,8 +39,7 @@ jobs:
           gh release create "${{ env.tag_name }}" dist/* \
               --repo="$GITHUB_REPOSITORY" \
               --title="${{ env.release_name }}" \
-              --generate-notes \
-              --prerelease
+              --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
           tag_name: v0.0.1
