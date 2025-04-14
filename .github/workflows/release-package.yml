@@ -1,0 +1,40 @@
+name: Python package
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11","3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      # Install PDM
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v3
+        with:
+          python-version: 3.11
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+          cache: pip
+          cache-dependency-path: pdm.lock
+      - name: Install Dependencies
+        run: |
+          pdm sync -d && pdm add twine
+      - name: Build package
+        run: |
+          pdm build
+      - name: Publish package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pdm add twine && \
+          pdm run twine upload --repository-url https://api.github.com/orgs/${{ github.repository_owner }}/packages/pypi/upload dist/*
