@@ -7,6 +7,28 @@ on:
       - '*'
 
 jobs:
+  # create-release:
+  #   name: Create Release
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Checkout branch "master"
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: 'develop'
+
+  #     - name: Create release
+  #       run: |
+  #         gh release create "${{ env.tag_name }}" \
+  #             --repo="$GITHUB_REPOSITORY" \
+  #             --title="${{ env.release_name }}" \
+  #             --generate-notes \
+  #             --prerelease
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         tag_name: v0.0.1
+  #         release_name: v0.0.1
+
   build:
 
     runs-on: ubuntu-latest
@@ -32,11 +54,24 @@ jobs:
       - name: Build package
         run: |
           pdm build
-      - name: Publish package
-        env:
-          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+
+      - name: Create release
         run: |
-          pdm add twine && \
-          pdm run twine upload --repository-url https://api.github.com/orgs/${{ github.repository_owner }}/packages/pypi/upload dist/*
+          gh release create "${{ env.tag_name }}" dist/* \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${{ env.release_name }}" \
+              --generate-notes \
+              --prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: v0.0.1
+          release_name: v0.0.1
+
+      # - name: Publish package
+      #   env:
+      #     PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      #     TWINE_USERNAME: __token__
+      #     TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      #   run: |
+      #     pdm add twine && \
+      #     pdm run twine upload --repository-url https://api.github.com/orgs/${{ github.repository_owner }}/packages/pypi/upload dist/*
