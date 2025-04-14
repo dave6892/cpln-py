@@ -12,11 +12,15 @@ class CPLNClient:
     A client for communicating with a Control Plane Server.
 
     Example:
+        ```
         >>> import cpln
         >>> client = cpln.CPLNClient(base_url='https://api.cpln.io')
+        ```
 
     Args:
         base_url (str): URL to the Control Plane server.
+        org (str): The orgnanization namespace of your control plane service.
+        token (str): Authorization token for accessing the use of the API.
     """
 
     def __init__(self, *args, **kwargs):
@@ -30,14 +34,11 @@ class CPLNClient:
         The environment variables used are the same as those used by the
         cpln command-line client. They are:
 
-        .. envvar:: CPLN_URL
+        .. envvar:: `CPLN_TOKEN`
+        Authorization token for accessing the use of the API.
 
-            The URL to the Control Plane server.
-
-        .. envvar:: CPLN_TOKEN
-
-            Authorization token for accessing the use of the API.
-
+        .. envvar:: `CPLN_ORG`
+        The orgnanization namespace of your control plane service.
 
         Args:
             version (str): The version of the API to use. Set to ``auto`` to
@@ -47,11 +48,6 @@ class CPLNClient:
                 to save in the pool.
             environment (dict): The environment to read environment variables
                 from. Default: the value of ``os.environ``
-            credstore_env (dict): Override environment variables when calling
-                the credential store process.
-            use_ssh_client (bool): If set to `True`, an ssh connection is
-                made via shelling out to the ssh client. Ensure the ssh
-                client is installed and configured on the host.
 
         Example:
 
@@ -62,14 +58,23 @@ class CPLNClient:
 
     @property
     def gvcs(self):
+        """
+        A collection of GVCs in the Control Plane.
+        """
         return GVCCollection(client=self)
 
     @property
     def images(self):
+        """
+        A collection of images in the Control Plane.
+        """
         return ImageCollection(client=self)
 
     @property
     def workloads(self):
+        """
+        A collection of workloads in the Control Plane.
+        """
         return WorkloadCollection(client=self)
 
 
