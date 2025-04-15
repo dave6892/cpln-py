@@ -34,9 +34,9 @@ jobs:
           python-version: 3.12
           cache-dependency-path: pdm.lock
 
-      # - name: Install Dependencies
-      #   run: |
-      #     pdm sync -d
+      - name: Install Dependencies
+        run: |
+          pdm sync -d
 
       - name: Build package
         run: |
