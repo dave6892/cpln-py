@@ -44,6 +44,7 @@ jobs:
 
       - name: Create release
         run: |
+          tag_name_fixed=${tag_name#release-}
           gh release create "$tag_name_fixed" dist/* \
               --repo="$GITHUB_REPOSITORY" \
               --title="$tag_name_fixed" \
