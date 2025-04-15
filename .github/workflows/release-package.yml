@@ -44,7 +44,7 @@ jobs:
 
       - name: Create release
         run: |
-          tag_name=(python3 -c "pdm version")
+          tag_name=$(pdm version)
           gh release create "v$tag_name" dist/* \
               --repo="$GITHUB_REPOSITORY" \
               --title="$tag_name" \
