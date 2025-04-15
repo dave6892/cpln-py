@@ -1,2 +1,5 @@
+from . import __version__
+
+
 def get_version():
-    return "0.1.11"
+    return __version__
