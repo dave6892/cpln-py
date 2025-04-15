@@ -44,3 +44,6 @@ distribution = true
 [tool.pdm.version]
 source = "file"
 path = "src/cpln/__init__.py"
+
+[tool.pdm.scripts]
+version.cmd = "get_version.py"

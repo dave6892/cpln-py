@@ -44,10 +44,10 @@ jobs:
 
       - name: Create release
         run: |
-          tag_name_fixed=${tag_name#release-}
-          gh release create "$tag_name_fixed" dist/* \
+          tag_name=(python3 -c "pdm version")
+          gh release create "v$tag_name" dist/* \
               --repo="$GITHUB_REPOSITORY" \
-              --title="$tag_name_fixed" \
+              --title="$tag_name" \
               --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
