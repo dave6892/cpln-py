@@ -6,8 +6,9 @@ clean:
 	find . -path "*__pycache__" | xargs rm -rf
 	find . -path "*egg-info"    | xargs rm -rf
 
-release:
+version:
 	@sed -i '' 's/version = "\PROJECT_VERSION\"/version = "$(RELEASE_VERSION)"/' pyproject.toml
+
+release:
 	@git tag -a "release-v$(RELEASE_VERSION)" -m "Release v$(RELEASE_VERSION)"
 	@git push origin "release-v$(RELEASE_VERSION)"
-	@sed -i '' 's/version = "$(RELEASE_VERSION)"/version = "\PROJECT_VERSION\"/' pyproject.toml
