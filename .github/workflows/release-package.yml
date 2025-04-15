@@ -2,40 +2,52 @@ name: Python package
 
 on:
   workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release name'
+        required: true
+        default: 'v0.0.1'
   push:
     tags:
-      - '*'
+      - 'release-*'
+
+env:
+  # tag_name: ${{ github.event.ref }}
+  tag_name: ${{ github.ref_name }}
 
 jobs:
+
   build:
 
     runs-on: ubuntu-latest
-    # strategy:
-    #   matrix:
-    #     python-version: ["3.9", "3.10", "3.11","3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      # Install PDM
+
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: 3.11
+          python-version: 3.12
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: 3.11
-          cache: pip
+          python-version: 3.12
           cache-dependency-path: pdm.lock
+
       - name: Install Dependencies
         run: |
-          pdm sync -d && pdm add twine
+          pdm sync -d
+
       - name: Build package
         run: |
           pdm build
-      - name: Publish package
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release
         run: |
-          pdm add twine && \
-          pdm run twine upload --repository-url https://api.github.com/orgs/${{ github.repository_owner }}/packages/pypi/upload dist/*
+          tag_name_fixed=${tag_name#release-}
+          gh release create "$tag_name_fixed" dist/* \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="$tag_name_fixed" \
+              --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
