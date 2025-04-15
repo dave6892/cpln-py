@@ -36,6 +36,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          tag_name_fixed=${tag_name#release-}
+          sed -i '' 's/version = "\PROJECT_VERSION\"/version = "${tag_name_fixed}"/' pyproject.toml
           pdm sync -d
 
       - name: Build package
@@ -45,7 +47,6 @@ jobs:
       - name: Create release
         run: |
           tag_name_fixed=${tag_name#release-}
-          sed -i '' 's/version = "\PROJECT_VERSION\"/version = "${tag_name_fixed}"/' pyproject.toml
           gh release create "$tag_name_fixed" dist/* \
               --repo="$GITHUB_REPOSITORY" \
               --title="$tag_name_fixed" \
