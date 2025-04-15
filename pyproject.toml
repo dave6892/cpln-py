@@ -1,6 +1,6 @@
 [project]
 name = "cpln-py"
-version = "0.0.0"
+dynamic = ["version"]
 description = "A Python library for the Control Plane API"
 authors = [
     {name = "dave6892", email = "dave6892@gmail.com"},
@@ -22,13 +22,6 @@ dependencies = [
     "websocket-client>=1.8.0",
 ]
 
-[build-system]
-requires = ["setuptools>=62", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.pdm]
-distribution = true
-
 [dependency-groups]
 docs = [
     "mkdocs>=1.6.1",
@@ -38,3 +31,16 @@ lint = [
     "flake8>=7.2.0",
     "black>=25.1.0",
 ]
+
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.version]
+source = "file"
+path = "src/cpln/__init__.py"
