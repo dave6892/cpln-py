@@ -2,18 +2,9 @@ name: Python package
 
 on:
   workflow_dispatch:
-    inputs:
-      release_name:
-        description: 'Release name'
-        required: true
-        default: 'v0.0.1'
   push:
     tags:
       - 'release-*'
-
-env:
-  # tag_name: ${{ github.event.ref }}
-  tag_name: ${{ github.ref_name }}
 
 jobs:
 
@@ -28,15 +19,11 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.12
-          cache-dependency-path: pdm.lock
-
-      - name: Install Dependencies
-        run: |
-          pdm sync -d
+      # - name: Set up Python 3.12
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: 3.12
+      #     cache-dependency-path: pdm.lock
 
       - name: Build package
         run: |
@@ -50,11 +37,14 @@ jobs:
 
 
   pypi-publish:
+
     runs-on: ubuntu-latest
     needs:
       - build
+
     permissions:
       id-token: write
+
     steps:
       - name: Retrieve release distributions
         uses: actions/download-artifact@v4
