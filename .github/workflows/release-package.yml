@@ -34,9 +34,9 @@ jobs:
           python-version: 3.12
           cache-dependency-path: pdm.lock
 
-      - name: Install Dependencies
-        run: |
-          pdm sync -d
+      # - name: Install Dependencies
+      #   run: |
+      #     pdm sync -d
 
       - name: Build package
         run: |
@@ -44,8 +44,6 @@ jobs:
 
       - name: Create release
         run: |
-          tag_name_fixed=${tag_name#release-}
-          make version RELEASE_VERSION=${tag_name#release-v}
           gh release create "$tag_name_fixed" dist/* \
               --repo="$GITHUB_REPOSITORY" \
               --title="$tag_name_fixed" \
