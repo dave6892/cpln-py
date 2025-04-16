@@ -1,6 +1,11 @@
 import time
 import cpln
-from cpln.errors import APIError, WebSocketExitCodeError
+from cpln.errors import (
+    APIError,
+    WebSocketExitCodeError,
+    WebSocketOperationError,
+    WebSocketConnectionError,
+)
 
 
 client = cpln.from_env()
@@ -10,14 +15,14 @@ client = cpln.CPLNClient(
 )
 print(client)
 
-# print("GVCs in my control plane:")
-# for gvc in client.gvcs.list():
-#     print(gvc)
+print("GVCs in my control plane:")
+for gvc in client.gvcs.list():
+    print(gvc)
 
-# print()
-# print("images in my control plane:")
-# for image in client.images.list():
-#     print(image)
+print()
+print("images in my control plane:")
+for image in client.images.list():
+    print(image)
 
 gvc = 'apalis-dev'
 print()
@@ -26,15 +31,28 @@ for workload in (workloads:=client.workloads.list(gvc)):
     print(workload)
 
 
+
 workload_name = "insurance-api-standard"
-workloads[workload_name].suspend(False) # unsuspending the workload
+workloads[workload_name].unsuspend() # unsuspending the workload
 
 while True:
     try:
         workloads[workload_name].ping(location="aws-us-west-2")
         print(f"Workload (workloads{[workload_name]}) is up and running!")
         break
-    except APIError as e:
+    except WebSocketExitCodeError as e:
+        print("Retrying...")
+        time.sleep(1)
+        continue
+    except WebSocketOperationError as e:
+        print("Retrying...")
+        time.sleep(1)
+        continue
+    except WebSocketConnectionError as e:
+        print("Retrying...")
+        time.sleep(1)
+        continue
+    except Exception as e:
         print("Retrying...")
         time.sleep(1)
         continue
@@ -46,13 +64,16 @@ workloads[workload_name].exec(
 
 
 try:
-
     workloads[workload_name].exec(
-        command="aws s3 cp /var/local/storage/tmp.dump s3://apalis-postgres-backup/apalis_playground/tmp_test/postgres_backup.dump",
+        command="aws s3 tmp",
         location="aws-us-west-2",
     )
 except WebSocketExitCodeError as e:
-    print(f"Got the error {e}")
-
-
-workloads[workload_name].suspend(True)
+    print(f"Command failed with exit code: {e}")
+except Exception as e:
+    print(f"Unexpected error occurred: {e}")
+else:
+    print("Command executed successfully")
+finally:
+    print("Cleaning up...")
+    workloads[workload_name].suspend()
