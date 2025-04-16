@@ -125,3 +125,24 @@ class ContextNotFound(CPLNException):
 
     def __str__(self):
         return (f"context '{self.name}' not found")
+
+
+class WebSocketError(Exception):
+    """Base class for all WebSocket-related errors."""
+    pass
+
+class WebSocketConnectionError(WebSocketError):
+    """Raised when there are issues with the WebSocket connection."""
+    pass
+
+class WebSocketMessageError(WebSocketError):
+    """Raised when there are issues with the WebSocket message content."""
+    pass
+
+class WebSocketExitCodeError(WebSocketMessageError):
+    """Raised when the WebSocket message indicates a non-zero exit code."""
+    pass
+
+class WebSocketOperationError(WebSocketMessageError):
+    """Raised when the WebSocket message indicates an operation error."""
+    pass

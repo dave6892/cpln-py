@@ -1,17 +1,32 @@
 import json
 from websocket import WebSocketApp
+from ..errors import (
+    WebSocketConnectionError,
+    WebSocketExitCodeError,
+    WebSocketOperationError
+)
+from .exit_codes import (
+    AwsExitCode,
+    GenericExitCode,
+    PostgresExitCode
+)
 
 class WebSocketAPI:
 
     def __init__(self, remote_wss: str):
         self.remote_wss = remote_wss
+        self._request = None
+        self._error = None
 
     def exec(self, **kwargs):
         self._request = kwargs
+        self._error = None
         ws = self.websocket()
         ws.run_forever()
-        if ws.has_errored:
-            raise Exception("Error in websocket connection")
+
+        if self._error:
+            raise self._error
+
         return self._request
 
     def websocket(self):
@@ -25,17 +40,74 @@ class WebSocketAPI:
         return ws
 
     def _on_message(self, ws: WebSocketApp, message: str):
-        print(f"Message from server: {message}")
-        if "error" in message.decode():
+        try:
+            decoded_message = message.decode()
+            exit_code = 0
+
+            # Check for non-zero exit code
+            if "exit code" in decoded_message.lower():
+                try:
+                    exit_code = decoded_message.split("exit code")[-1].strip()
+                    exit_code = int(exit_code)
+                except ValueError:
+                    pass
+
+            if exit_code != 0:
+                command = self._request.get("command", [])
+                if isinstance(command, list):
+                    command = command[0] if command else ""
+
+                if command == "aws":
+                    if AwsExitCode.is_error(exit_code):
+                        error_type = AwsExitCode.get_error_type(exit_code)
+                        error_message = AwsExitCode.get_message(exit_code)
+                elif command in ["pg_dump", "pg_restore"]:
+                    if PostgresExitCode.is_error(exit_code):
+                        error_type = PostgresExitCode.get_error_type(exit_code)
+                        error_message = PostgresExitCode.get_message(exit_code, command)
+                else:
+                    if GenericExitCode.is_error(exit_code):
+                        error_type = GenericExitCode.get_error_type(exit_code)
+                        error_message = GenericExitCode.get_message(exit_code)
+
+                self._error = WebSocketExitCodeError(
+                    f"{error_type if error_type else 'Error'} (exit code {exit_code}): {error_message}\n"
+                    f"Full message: {decoded_message}"
+                )
+
+                return exit_code
+
+            # Check for error messages
+            if "error" in decoded_message.lower():
+                self._error = WebSocketOperationError(f"Error in message: {decoded_message}")
+                return
+
+            # Check for failure messages
+            if "failed" in decoded_message.lower():
+                self._error = WebSocketOperationError(f"Operation failed: {decoded_message}")
+                return
+
+            print(decoded_message)
+            return exit_code
+
+        except Exception as e:
             ws.sock.close()
+            self._error = WebSocketOperationError(f"Error processing message: {str(e)}")
 
     def _on_error(self, ws: WebSocketApp, error: str):
-        print(f"Error: {error}")
+        self._error = WebSocketConnectionError(f"WebSocket error: {error}")
 
     def _on_close(self, ws: WebSocketApp, close_status_code: int, close_msg: str):
+        if not (close_status_code == 1000 or close_status_code is None):  # 1000 is normal closure
+            self._error = WebSocketConnectionError(
+                f"Connection closed unexpectedly with code {close_status_code}: {close_msg}"
+            )
         print(f"Connection closed, exit code: {close_status_code}")
 
     def _on_open(self, ws: WebSocketApp):
         print("Connection opened")
-        # Establish a connection with the replica
-        ws.send(json.dumps(self._request, indent=4))
+        try:
+            ws.send(json.dumps(self._request, indent=4))
+        except Exception as e:
+            self._error = WebSocketConnectionError(f"Error sending initial request: {str(e)}")
+            ws.sock.close()
