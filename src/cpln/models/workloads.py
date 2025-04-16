@@ -6,6 +6,7 @@ from .resource import (
 )
 from ..api import APIClient
 from ..config import WorkloadConfig
+from ..errors import WebSocketExitCodeError
 
 
 class Workload(Model):
@@ -64,11 +65,19 @@ class Workload(Model):
 
         Returns:
             (dict): The response from the server.
+
+        Raises:
+            :py:class:`cpln.errors.WebSocketExitCodeError`
+                If the command returns a non-zero exit code.
         """
-        return self.client.api.exec_workload(
-            config=self.config(location=location),
-            command=command
-        )
+        try:
+            return self.client.api.exec_workload(
+                config=self.config(location=location),
+                command=command
+            )
+        except WebSocketExitCodeError as e:
+            print(f"Command failed with exit code: {e}")
+            raise
 
     def ping(self, location: Optional[str] = None) -> dict[str, any]:
         """
@@ -80,10 +89,13 @@ class Workload(Model):
         Returns:
             (dict): The response from the server.
         """
-        return self.exec(
-            ["echo", "ping"],
-            location=location,
-        )
+        try:
+            return self.exec(
+                ["echo", "ping"],
+                location=location,
+            )
+        except Exception as e:
+            print("Cannot reach the workload")
 
 
     def config(self, location: Optional[str] = None) -> WorkloadConfig:
