@@ -41,6 +41,9 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = true
 
+
 [tool.pdm.version]
-source = "file"
-path = "src/cpln/__init__.py"
+source = "scm"
+write_to = "cpln/_version.py"
+write_template = "__version__ = '{}'"
+version_format = "src.version:format_version"

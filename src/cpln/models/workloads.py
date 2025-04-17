@@ -6,6 +6,7 @@ from .resource import (
 )
 from ..api import APIClient
 from ..config import WorkloadConfig
+from ..errors import WebSocketExitCodeError
 
 
 class Workload(Model):
@@ -39,21 +40,11 @@ class Workload(Model):
         self.client.api.delete_workload(self.config())
         print("Deleted!")
 
-    def suspend(self,
-        state: bool = True
-    ) -> None:
-        tmp = self.client.api.patch_workload(
-            config=self.config(),
-            data={
-                "spec": {
-                    "defaultOptions": {
-                        "suspend": str(state).lower()
-                    }
-                }
-            }
-        )
-        print(f"{'' if state else 'Un'}Suspending Workload: {self}")
-        return tmp
+    def suspend(self) -> None:
+        self._change_suspend_state(state=True)
+
+    def unsuspend(self) -> None:
+        self._change_suspend_state(state=False)
 
     def exec(self, command: str, location: str):
         """
@@ -64,11 +55,19 @@ class Workload(Model):
 
         Returns:
             (dict): The response from the server.
+
+        Raises:
+            :py:class:`cpln.errors.WebSocketExitCodeError`
+                If the command returns a non-zero exit code.
         """
-        return self.client.api.exec_workload(
-            config=self.config(location=location),
-            command=command
-        )
+        try:
+            return self.client.api.exec_workload(
+                config=self.config(location=location),
+                command=command
+            )
+        except WebSocketExitCodeError as e:
+            print(f"Command failed with exit code: {e}")
+            raise
 
     def ping(self, location: Optional[str] = None) -> dict[str, any]:
         """
@@ -80,10 +79,13 @@ class Workload(Model):
         Returns:
             (dict): The response from the server.
         """
-        return self.exec(
-            ["echo", "ping"],
-            location=location,
-        )
+        try:
+            return self.exec(
+                ["echo", "ping"],
+                location=location,
+            )
+        except Exception as e:
+            print("Cannot reach the workload")
 
 
     def config(self, location: Optional[str] = None) -> WorkloadConfig:
@@ -155,6 +157,22 @@ class Workload(Model):
             (list): The containers of the workload.
         """
         return self.client.api.get_containers(self.config(location=location))
+
+    def _change_suspend_state(self,
+        state: bool = True
+    ) -> None:
+        output = self.client.api.patch_workload(
+            config=self.config(),
+            data={
+                "spec": {
+                    "defaultOptions": {
+                        "suspend": str(state).lower()
+                    }
+                }
+            }
+        )
+        print(f"{'' if state else 'Un'}Suspending Workload: {self}")
+        return output
 
 
 class WorkloadCollection(Collection):
