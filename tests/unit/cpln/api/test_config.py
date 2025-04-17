@@ -52,3 +52,20 @@ def test_api_config_missing_required_fields():
             base_url=os.getenv('CPLN_BASE_URL'),
             org=os.getenv('CPLN_ORG')
         )  # Missing token
+
+
+def test_api_config_asdict():
+    config = APIConfig(
+        base_url=os.getenv('CPLN_BASE_URL'),
+        org=os.getenv('CPLN_ORG'),
+        token=os.getenv('CPLN_TOKEN')
+    )
+    config_dict = {
+        'base_url': os.getenv('CPLN_BASE_URL'),
+        'org': os.getenv('CPLN_ORG'),
+        'token': os.getenv('CPLN_TOKEN'),
+        'version': DEFAULT_CPLN_API_VERSION,
+        'timeout': DEFAULT_TIMEOUT_SECONDS,
+        'org_url': f"{os.getenv('CPLN_BASE_URL')}/org/{os.getenv('CPLN_ORG')}"
+    }
+    assert config.asdict() == config_dict
