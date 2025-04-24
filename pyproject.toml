@@ -22,7 +22,12 @@ dependencies = [
     "websocket-client>=1.8.0",
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "requests-mock>=1.12.1",
+]
 docs = [
     "mkdocs>=1.6.1",
     "mkdocstrings[python]>=0.29.1",
@@ -31,11 +36,7 @@ lint = [
     "flake8>=7.2.0",
     "black>=25.1.0",
 ]
-tests = [
-	"pytest==8.3.5",
-	"pytest-cov==6.1.1",
-	"requests-mock==1.12.1",
-]
+
 
 [build-system]
 requires = ["pdm-backend"]
