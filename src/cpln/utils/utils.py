@@ -17,8 +17,12 @@ def kwargs_from_env(environment=None):
 
     if token:
         params['token'] = token
+    else:
+        raise ValueError('CPLN_TOKEN is not set')
 
     if org:
         params['org'] = org
+    else:
+        raise ValueError('CPLN_ORG is not set')
 
     return params

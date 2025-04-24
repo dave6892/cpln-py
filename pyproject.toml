@@ -22,7 +22,12 @@ dependencies = [
     "websocket-client>=1.8.0",
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "requests-mock>=1.12.1",
+]
 docs = [
     "mkdocs>=1.6.1",
     "mkdocstrings[python]>=0.29.1",
@@ -40,7 +45,6 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
-
 
 [tool.pdm.version]
 source = "scm"
