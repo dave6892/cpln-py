@@ -1,5 +1,8 @@
 # API
 
+<!-- ## Client
 ::: src.cpln.api.client.APIClient
-	options:
-		show_root_heading: true
+
+## Workloads
+::: src.cpln.api.workload.WorkloadApiMixin
+::: src.cpln.api.workload.WorkloadDeploymentMixin -->
