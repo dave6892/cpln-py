@@ -13,7 +13,7 @@ class APIClient(
     GVCApiMixin,
     ImageApiMixin,
     WorkloadApiMixin,
-    WorkloadDeploymentMixin,
+    WorkloadDeploymentMixin, #TODO: Test if I can remove this
 ):
     """
     A low-level client for the Control Plane API.
@@ -45,6 +45,15 @@ class APIClient(
     def _get(self,
         endpoint: str
     ):
+        """
+        Makes a GET request to the specified API endpoint.
+
+        Args:
+            endpoint (str): The API endpoint to request
+
+        Returns:
+            dict: The JSON response from the API
+        """
         resp = self.get(
             f"{self.config.org_url}/{endpoint}",
             headers = self._headers
@@ -54,6 +63,15 @@ class APIClient(
     def _delete(self,
         endpoint: str
     ):
+        """
+        Makes a DELETE request to the specified API endpoint.
+
+        Args:
+            endpoint (str): The API endpoint to delete
+
+        Returns:
+            requests.Response: The response object from the API
+        """
         return self.delete(
             f"{self.config.org_url}/{endpoint}",
             headers = self._headers
@@ -63,6 +81,16 @@ class APIClient(
         endpoint: str,
         data: dict[str, any] | None = None
     ):
+        """
+        Makes a PATCH request to the specified API endpoint.
+
+        Args:
+            endpoint (str): The API endpoint to update
+            data (dict, optional): The data to send in the request body
+
+        Returns:
+            requests.Response: The response object from the API
+        """
         return self.patch(
             f"{self.config.org_url}/{endpoint}",
             json = data,
