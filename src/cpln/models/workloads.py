@@ -7,7 +7,10 @@ from .resource import (
 from ..api import APIClient
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
-from ..utils import get_default_workload_template
+from ..utils import (
+    get_default_workload_template,
+    load_template
+)
 
 
 class Workload(Model):
@@ -183,23 +186,43 @@ class WorkloadCollection(Collection):
     model = Workload
 
     def create(self,
-        gvc: str = None,
-        config: WorkloadConfig = None,
+        name: str,
+        gvc: str | None = None,
+        config: WorkloadConfig | None = None,
+        description: str | None = None,
+        image: str | None = None,
+        container_name: str | None = None,
+        workload_type: str = "serverless",
+        spec_file_path: str | None = None,
     ) -> None:
         """
         Create the workload.
         """
         if gvc is None and config is None:
             raise ValueError("Either GVC or WorkloadConfig must be defined.")
-
         config = WorkloadConfig(gvc=gvc) if gvc else config
-        spec = get_default_workload_template("")
-        tmp = self.client.api.create_workload(config, spec)
-        print(tmp)
-        if tmp.status_code // 100 == 2:
-            print(tmp.text)
+
+        if spec_file_path is None:
+            if not image:
+                raise ValueError("Image is required.")
+            if not container_name:
+                raise ValueError("Container name is required.")
+
+            spec = get_default_workload_template(workload_type)
+            spec['name'] = name
+            spec['description'] = description if description is not None else ""
+            spec['spec']['containers'][0]['image'] = image
+            spec['spec']['containers'][0]['name'] = container_name
+
         else:
-            print(tmp.json())
+            spec = load_template(spec_file_path)
+
+        response = self.client.api.create_workload(config, spec)
+        print(response)
+        if response.status_code // 100 == 2:
+            print(response.text)
+        else:
+            print(response.json())
 
     def get(self,
         config: WorkloadConfig

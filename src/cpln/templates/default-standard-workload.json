@@ -1,14 +1,14 @@
 {
-  "name": "test",
-  "description": "test",
+  "name": "$WORKLOAD_NAME",
+  "description": "$DESCRIPTION",
   "tags": {},
-  "gvc": "david",
+  "gvc": "$GVC",
   "spec": {
-    "type": "serverless",
+    "type": "standard",
     "containers": [
       {
-        "name": "broker-api",
-        "image": "/org/ledgestone/image/apalis-broker-dashboard-api:011cd2e-develop",
+        "name": "$CONTAINER_NAME",
+				"image": "$IMAGE_NAME",
         "workingDir": "/",
         "ports": [
           {
@@ -55,7 +55,7 @@
     },
     "defaultOptions": {
       "autoscaling": {
-        "metric": "concurrency",
+        "metric": "cpu",
         "metricPercentile": "p50",
         "target": 100,
         "maxScale": 3,
@@ -64,7 +64,7 @@
         "maxConcurrency": 1000
       },
       "timeoutSeconds": 5,
-      "capacityAI": true,
+      "capacityAI": false,
       "spot": false,
       "debug": false,
       "suspend": false,

@@ -37,9 +37,10 @@ def load_template(template_path: str) -> dict[str, Any]:
 import os
 def get_default_workload_template(workload_type: str) -> dict[str, Any]:
     if workload_type == 'serverless':
-        return load_template('../templates/default-workload-serverless.json')
+        template_path = '../templates/default-serverless-workload.json'
     elif workload_type == 'standard':
-        return load_template('../templates/default-workload-standard.json')
+        template_path = '../templates/default-standard-workload.json'
     else:
-        # raise ValueError(f'Invalid workload type: {workload_type}')
-        return load_template(os.path.join(os.path.dirname(__file__), '../templates/default-workload.json'))
+        raise ValueError(f'Invalid workload type: {workload_type}')
+    spec = load_template(os.path.join(os.path.dirname(__file__), template_path))
+    return spec
