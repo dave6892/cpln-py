@@ -77,6 +77,26 @@ class APIClient(
             headers = self._headers
         )
 
+    def _post(self,
+        endpoint: str,
+        data: dict[str, any] | None = None
+    ):
+        """
+        Makes a PATCH request to the specified API endpoint.
+
+        Args:
+            endpoint (str): The API endpoint to update
+            data (dict, optional): The data to send in the request body
+
+        Returns:
+            requests.Response: The response object from the API
+        """
+        return self.post(
+            f"{self.config.org_url}/{endpoint}",
+            json = data,
+            headers = self._headers,
+        )
+
     def _patch(self,
         endpoint: str,
         data: dict[str, any] | None = None

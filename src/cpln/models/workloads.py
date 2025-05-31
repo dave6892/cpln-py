@@ -7,6 +7,7 @@ from .resource import (
 from ..api import APIClient
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
+from ..utils import get_default_workload_template
 
 
 class Workload(Model):
@@ -180,6 +181,25 @@ class WorkloadCollection(Collection):
     Workloads on the server.
     """
     model = Workload
+
+    def create(self,
+        gvc: str = None,
+        config: WorkloadConfig = None,
+    ) -> None:
+        """
+        Create the workload.
+        """
+        if gvc is None and config is None:
+            raise ValueError("Either GVC or WorkloadConfig must be defined.")
+
+        config = WorkloadConfig(gvc=gvc) if gvc else config
+        spec = get_default_workload_template("")
+        tmp = self.client.api.create_workload(config, spec)
+        print(tmp)
+        if tmp.status_code // 100 == 2:
+            print(tmp.text)
+        else:
+            print(tmp.json())
 
     def get(self,
         config: WorkloadConfig

@@ -1,4 +1,4 @@
-from .utils import kwargs_from_env
+from .utils import kwargs_from_env, get_default_workload_template
 from .websocket import WebSocketAPI
 
 __all__ = [
