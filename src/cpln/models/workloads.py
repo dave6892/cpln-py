@@ -52,6 +52,10 @@ class Workload(Model):
         Clone the workload.
         """
         metadata = self.export()
+
+        # TODO: I need to get identity link from the REST API, in order
+        # to change it in the metadata. The path to the identity link is
+        # different for different GVCs.
         metadata["name"] = name
         if gvc is not None:
             metadata["gvc"] = gvc
