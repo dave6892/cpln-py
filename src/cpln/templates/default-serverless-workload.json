@@ -8,34 +8,16 @@
     "containers": [
       {
         "name": "$CONTAINER_NAME",
-				"image": "$IMAGE_NAME",
-        "workingDir": "/",
+        "cpu": "50m",
+        "image": "$IMAGE_NAME",
+        "inheritEnv": false,
+        "memory": "128Mi",
         "ports": [
           {
-            "protocol": "http",
-            "number": 8080
+            "number": 8080,
+            "protocol": "http"
           }
-        ],
-        "memory": "128Mi",
-        "cpu": "50m",
-        "env": [],
-        "inheritEnv": true,
-        "lifecycle": {
-          "postStart": {
-            "exec": {
-              "command": [
-                "echo 'postStart'"
-              ]
-            }
-          },
-          "preStop": {
-            "exec": {
-              "command": [
-                "echo 'preStop'"
-              ]
-            }
-          }
-        }
+        ]
       }
     ],
     "firewallConfig": {
@@ -45,8 +27,7 @@
         "outboundAllowHostname": [],
         "outboundAllowPort": [],
         "outboundAllowCIDR": [],
-        "outboundBlockedCIDR": [],
-        "http": {}
+        "outboundBlockedCIDR": []
       },
       "internal": {
         "inboundAllowType": "none",
@@ -72,7 +53,14 @@
         "enabled": false
       }
     },
-    "supportDynamicTags": true,
+    "loadBalancer": {
+      "direct": {
+        "enabled": false,
+        "ports": []
+      },
+      "replicaDirect": false
+    },
+    "supportDynamicTags": false,
     "rolloutOptions": {},
     "securityOptions": {}
   }

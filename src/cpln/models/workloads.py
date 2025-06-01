@@ -44,6 +44,27 @@ class Workload(Model):
         self.client.api.delete_workload(self.config())
         print("Deleted!")
 
+    def clone(self,
+        name: str,
+        gvc: str | None = None,
+    ) -> None:
+        """
+        Clone the workload.
+        """
+        metadata = self.export()
+        metadata["name"] = name
+        if gvc is not None:
+            metadata["gvc"] = gvc
+
+        response = self.client.api.create_workload(
+            config=self.config(gvc=gvc),
+            metadata=metadata,
+        )
+        if response.status_code // 100 == 2:
+            print(response.status_code, response.text)
+        else:
+            print(response.status_code, response.json())
+
     def suspend(self) -> None:
         self._change_suspend_state(state=True)
 
@@ -81,18 +102,43 @@ class Workload(Model):
             location (str): The location of the workload.
                 Default: None
         Returns:
-            (dict): The response from the server.
+            (dict): The response from the server containing status, message, and exit code.
         """
         try:
-            return self.exec(
+            response = self.exec(
                 ["echo", "ping"],
                 location=location,
             )
+            return {
+                "status": 200,
+                "message": "Successfully pinged workload",
+                "exit_code": 0
+            }
+        except WebSocketExitCodeError as e:
+            return {
+                "status": 500,
+                "message": f"Command failed with exit code: {e}",
+                "exit_code": e.exit_code
+            }
         except Exception as e:
-            print("Cannot reach the workload")
+            return {
+                "status": 500,
+                "message": str(e),
+                "exit_code": -1
+            }
 
+    def export(self) -> dict[str, any]:
+        """
+        Export the workload.
+        """
+        self.get()
+        return {
+            "name": self.attrs["name"],
+            "gvc": self.state["gvc"],
+            "spec": self.attrs["spec"]
+        }
 
-    def config(self, location: Optional[str] = None) -> WorkloadConfig:
+    def config(self, location: Optional[str] = None, gvc: Optional[str] = None) -> WorkloadConfig:
         """
         Get the workload config.
 
@@ -104,7 +150,7 @@ class Workload(Model):
             (WorkloadConfig): The workload config.
         """
         return WorkloadConfig(
-            gvc=self.state["gvc"],
+            gvc=self.state["gvc"] if gvc is None else gvc,
             workload_id=self.attrs["name"],
             location=location
         )
@@ -193,7 +239,8 @@ class WorkloadCollection(Collection):
         image: str | None = None,
         container_name: str | None = None,
         workload_type: str = "serverless",
-        spec_file_path: str | None = None,
+        metadata_file_path: str | None = None,
+        metadata: dict | None = None,
     ) -> None:
         """
         Create the workload.
@@ -202,27 +249,49 @@ class WorkloadCollection(Collection):
             raise ValueError("Either GVC or WorkloadConfig must be defined.")
         config = WorkloadConfig(gvc=gvc) if gvc else config
 
-        if spec_file_path is None:
-            if not image:
-                raise ValueError("Image is required.")
-            if not container_name:
-                raise ValueError("Container name is required.")
+        if metadata is None:
+            if metadata_file_path is None:
+                if not image:
+                    raise ValueError("Image is required.")
+                if not container_name:
+                    raise ValueError("Container name is required.")
 
-            spec = get_default_workload_template(workload_type)
-            spec['name'] = name
-            spec['description'] = description if description is not None else ""
-            spec['spec']['containers'][0]['image'] = image
-            spec['spec']['containers'][0]['name'] = container_name
+                metadata = get_default_workload_template(workload_type)
+                metadata['name'] = name
+                metadata['description'] = description if description is not None else ""
+                metadata['spec']['containers'][0]['image'] = image
+                metadata['spec']['containers'][0]['name'] = container_name
 
+            else:
+                metadata = load_template(metadata_file_path)
         else:
-            spec = load_template(spec_file_path)
+            metadata['name'] = name
 
-        response = self.client.api.create_workload(config, spec)
-        print(response)
+        response = self.client.api.create_workload(config, metadata)
         if response.status_code // 100 == 2:
-            print(response.text)
+            print(response.status_code, response.text)
         else:
-            print(response.json())
+            print(response.status_code, response.json())
+
+    # def clone(self,
+    #     name: str,
+    #     workload_id: str,
+    #     gvc: str | None = None,
+    # ) -> None:
+    #     """
+    #     Clone the workload.
+    #     """
+    #     workload = self.get(
+    #         config=WorkloadConfig(
+    #             gvc=gvc,
+    #             workload_id=workload_id
+    #         )
+    #     )
+    #     self.create(
+    #         name=name,
+    #         gvc=gvc if gvc is not None else self.state["gvc"],
+    #         metadata=workload.export()
+    #     )
 
     def get(self,
         config: WorkloadConfig
