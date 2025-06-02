@@ -52,6 +52,7 @@ tmp = client.workloads.get(
 tmp.clone(
     name=workload_name,
     gvc=gvc,
+    workload_type="standard",
 )
 
 # # workloads[workload_name].unsuspend() # unsuspending the workload
@@ -71,22 +72,6 @@ workloads[workload_name].exec(
     command="echo hello world",
     location=location,
 )
-
-
-# # # try:
-# # #     workloads[workload_name].exec(
-# # #         command="aws s3 tmp",
-# # #         location=location,
-# # #     )
-# # # except WebSocketExitCodeError as e:
-# # #     print(f"Command failed with exit code: {e}")
-# # # except Exception as e:
-# # #     print(f"Unexpected error occurred: {e}")
-# # # else:
-# # #     print("Command executed successfully")
-# # # finally:
-# # #     print("Cleaning up...")
-# # #     workloads[workload_name].suspend()
 
 
 tmp = client.workloads.get(
