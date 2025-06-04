@@ -2,12 +2,13 @@ import pytest
 import os
 from unittest.mock import Mock, patch
 import requests
+from typing import Any, cast
 from cpln.api.client import APIClient
 from cpln.api.config import APIConfig
 
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> Mock:
     """
     Return a mock APIConfig object for testing with properly configured properties.
     
@@ -26,7 +27,7 @@ def mock_config():
 
 
 @pytest.fixture
-def mock_api_client(mock_config):
+def mock_api_client(mock_config: Mock) -> APIClient:
     """
     Create a properly mocked APIClient for testing.
     
@@ -65,22 +66,22 @@ def mock_api_client(mock_config):
     client = APIClient(config=mock_config)
     
     # Replace the requests.Session methods with our mocks
-    client.get = mock_get
-    client.post = mock_post
-    client.patch = mock_patch
-    client.delete = mock_delete
+    client.get = mock_get  # type: ignore
+    client.post = mock_post  # type: ignore
+    client.patch = mock_patch  # type: ignore
+    client.delete = mock_delete  # type: ignore
     
     # Store mocks on the client for access in tests
-    client._mock_get = mock_get
-    client._mock_post = mock_post
-    client._mock_patch = mock_patch
-    client._mock_delete = mock_delete
+    setattr(client, '_mock_get', mock_get)
+    setattr(client, '_mock_post', mock_post)
+    setattr(client, '_mock_patch', mock_patch)
+    setattr(client, '_mock_delete', mock_delete)
     
     # Store responses for direct access in tests
-    client._mock_get_response = mock_get_response
-    client._mock_post_response = mock_post_response
-    client._mock_patch_response = mock_patch_response
-    client._mock_delete_response = mock_delete_response
+    setattr(client, '_mock_get_response', mock_get_response)
+    setattr(client, '_mock_post_response', mock_post_response)
+    setattr(client, '_mock_patch_response', mock_patch_response)
+    setattr(client, '_mock_delete_response', mock_delete_response)
     
     return client
 
