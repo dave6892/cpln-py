@@ -7,6 +7,10 @@ from .resource import (
 from ..api import APIClient
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
+from ..utils import (
+    get_default_workload_template,
+    load_template
+)
 
 
 class Workload(Model):
@@ -39,6 +43,63 @@ class Workload(Model):
         print(f"Deleting Workload: {self}")
         self.client.api.delete_workload(self.config())
         print("Deleted!")
+
+    def clone(self,
+        name: str,
+        gvc: str | None = None,
+        workload_type: str | None = None,
+    ) -> None:
+        """
+        Clone the workload.
+        
+        Args:
+            name (str): The name of the new workload.
+            gvc (str, optional): The GVC to create the workload in. Defaults to None.
+            workload_type (str, optional): The type of workload to create. Defaults to None.
+                
+        Returns:
+            None
+        
+        Raises:
+            Exception: If the API returns a non-2xx status code.
+        """
+        metadata = self.export()
+
+        # TODO: I need to get identity link from the REST API, in order
+        # to change it in the metadata. The path to the identity link is
+        # different for different GVCs.
+
+        # TODO: The parameters to the created/cloned workloads are too limited.
+        # In order for this package to be more widely used, we need to implement
+        # a way to pass more workload configuration parameters.
+        metadata["name"] = name
+        if gvc is not None:
+            metadata["gvc"] = gvc
+
+        if workload_type is not None:
+            metadata['spec']['type'] = workload_type
+            
+            # Ensure defaultOptions exists
+            if 'defaultOptions' not in metadata['spec']:
+                metadata['spec']['defaultOptions'] = {}
+                
+            # Ensure autoscaling exists
+            if 'autoscaling' not in metadata['spec']['defaultOptions']:
+                metadata['spec']['defaultOptions']['autoscaling'] = {}
+                
+            # Set autoscaling metric and capacityAI
+            metadata['spec']['defaultOptions']['autoscaling']['metric'] = "cpu"
+            metadata['spec']['defaultOptions']['capacityAI'] = False
+
+        response = self.client.api.create_workload(
+            config=self.config(gvc=gvc),
+            metadata=metadata,
+        )
+        if response.status_code // 100 == 2:
+            print(response.status_code, response.text)
+        else:
+            print(response.status_code, response.json())
+            raise
 
     def suspend(self) -> None:
         self._change_suspend_state(state=True)
@@ -77,18 +138,43 @@ class Workload(Model):
             location (str): The location of the workload.
                 Default: None
         Returns:
-            (dict): The response from the server.
+            (dict): The response from the server containing status, message, and exit code.
         """
         try:
-            return self.exec(
+            response = self.exec(
                 ["echo", "ping"],
                 location=location,
             )
+            return {
+                "status": 200,
+                "message": "Successfully pinged workload",
+                "exit_code": 0
+            }
+        except WebSocketExitCodeError as e:
+            return {
+                "status": 500,
+                "message": f"Command failed with exit code: {e}",
+                "exit_code": e.exit_code
+            }
         except Exception as e:
-            print("Cannot reach the workload")
+            return {
+                "status": 500,
+                "message": str(e),
+                "exit_code": -1
+            }
 
+    def export(self) -> dict[str, any]:
+        """
+        Export the workload.
+        """
+        self.get()
+        return {
+            "name": self.attrs["name"],
+            "gvc": self.state["gvc"],
+            "spec": self.attrs["spec"]
+        }
 
-    def config(self, location: Optional[str] = None) -> WorkloadConfig:
+    def config(self, location: Optional[str] = None, gvc: Optional[str] = None) -> WorkloadConfig:
         """
         Get the workload config.
 
@@ -100,7 +186,7 @@ class Workload(Model):
             (WorkloadConfig): The workload config.
         """
         return WorkloadConfig(
-            gvc=self.state["gvc"],
+            gvc=self.state["gvc"] if gvc is None else gvc,
             workload_id=self.attrs["name"],
             location=location
         )
@@ -180,6 +266,53 @@ class WorkloadCollection(Collection):
     Workloads on the server.
     """
     model = Workload
+
+    def create(self,
+        name: str,
+        gvc: str | None = None,
+        config: WorkloadConfig | None = None,
+        description: str | None = None,
+        image: str | None = None,
+        container_name: str | None = None,
+        workload_type: str | None = None,
+        metadata_file_path: str | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        """
+        Create the workload.
+        """
+        if gvc is None and config is None:
+            raise ValueError("Either GVC or WorkloadConfig must be defined.")
+        config = WorkloadConfig(gvc=gvc) if gvc else config
+
+        if metadata is None:
+            if metadata_file_path is None:
+                if not image:
+                    raise ValueError("Image is required.")
+                if not container_name:
+                    raise ValueError("Container name is required.")
+
+                metadata = get_default_workload_template("serverless" if workload_type is None else workload_type)
+                metadata['name'] = name
+                metadata['description'] = description if description is not None else ""
+                metadata['spec']['containers'][0]['image'] = image
+                metadata['spec']['containers'][0]['name'] = container_name
+
+            else:
+                metadata = load_template(metadata_file_path)
+        else:
+            metadata['name'] = name
+            if workload_type is not None:
+                metadata['spec']['type'] = workload_type
+                metadata['spec']['defaultOptions']['autoscaling']['metric'] = "cpu"
+                metadata['spec']['defaultOptions']['capacityAI'] = False
+
+        response = self.client.api.create_workload(config, metadata)
+        if response.status_code // 100 == 2:
+            print(response.status_code, response.text)
+        else:
+            print(response.status_code, response.json())
+            raise
 
     def get(self,
         config: WorkloadConfig

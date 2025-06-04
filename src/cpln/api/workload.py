@@ -147,6 +147,18 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
             endpoint += f'/{config.workload_id}'
         return self._get(endpoint)
 
+    def create_workload(self,
+        config: WorkloadConfig,
+        metadata: dict[str, Any],
+    ):
+        """
+        Creates a workload.
+        """
+        endpoint = f'gvc/{config.gvc}/workload'
+        return self._post(endpoint,
+            data=metadata
+        )
+
     def delete_workload(self,
         config: WorkloadConfig
     ):

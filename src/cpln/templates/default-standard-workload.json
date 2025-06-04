@@ -1,0 +1,79 @@
+{
+  "name": "$WORKLOAD_NAME",
+  "description": "$DESCRIPTION",
+  "tags": {},
+  "gvc": "$GVC",
+  "spec": {
+    "type": "standard",
+    "containers": [
+      {
+        "name": "$CONTAINER_NAME",
+				"image": "$IMAGE_NAME",
+        "workingDir": "/",
+        "ports": [
+          {
+            "protocol": "http",
+            "number": 8080
+          }
+        ],
+        "memory": "128Mi",
+        "cpu": "50m",
+        "env": [],
+        "inheritEnv": true,
+        "lifecycle": {
+          "postStart": {
+            "exec": {
+              "command": [
+                "echo 'postStart'"
+              ]
+            }
+          },
+          "preStop": {
+            "exec": {
+              "command": [
+                "echo 'preStop'"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "firewallConfig": {
+      "external": {
+        "inboundAllowCIDR": [],
+        "inboundBlockedCIDR": [],
+        "outboundAllowHostname": [],
+        "outboundAllowPort": [],
+        "outboundAllowCIDR": [],
+        "outboundBlockedCIDR": [],
+        "http": {}
+      },
+      "internal": {
+        "inboundAllowType": "none",
+        "inboundAllowWorkload": []
+      }
+    },
+    "defaultOptions": {
+      "autoscaling": {
+        "metric": "cpu",
+        "metricPercentile": "p50",
+        "target": 100,
+        "maxScale": 3,
+        "minScale": 1,
+        "scaleToZeroDelay": 300,
+        "maxConcurrency": 1000
+      },
+      "timeoutSeconds": 5,
+      "capacityAI": false,
+      "spot": false,
+      "debug": false,
+      "suspend": false,
+      "multiZone": {
+        "enabled": false
+      }
+    },
+    "supportDynamicTags": true,
+    "rolloutOptions": {},
+    "securityOptions": {}
+  }
+}
