@@ -1,3 +1,4 @@
+from typing import Dict, Optional, Any
 from .api import APIClient
 from .models import (
     GVCCollection,
@@ -23,8 +24,35 @@ class CPLNClient:
         token (str): Authorization token for accessing the use of the API.
     """
 
-    def __init__(self, *args, **kwargs):
-        self.api = APIClient(*args, **kwargs)
+    def __init__(self,
+        base_url: Optional[str] = None,
+        org: Optional[str] = None,
+        token: Optional[str] = None,
+        **kwargs
+    ):
+        """
+        Initialize a CPLNClient.
+
+        Args:
+            base_url (str, optional): URL to the Control Plane server.
+            org (str, optional): The organization namespace of your control plane service.
+            token (str, optional): Authorization token for accessing the API.
+            **kwargs: Additional arguments to pass to the APIClient.
+        """
+        # Create a config dict with all the args
+        config_args = {}
+        if base_url is not None:
+            config_args['base_url'] = base_url
+        if org is not None:
+            config_args['org'] = org
+        if token is not None:
+            config_args['token'] = token
+
+        # Add any other kwargs
+        config_args.update(kwargs)
+
+        # Create the API client
+        self.api = APIClient(**config_args)
 
     @classmethod
     def from_env(cls, **kwargs):
@@ -40,6 +68,9 @@ class CPLNClient:
         .. envvar:: `CPLN_ORG`
         The orgnanization namespace of your control plane service.
 
+        .. envvar:: `CPLN_BASE_URL`
+        URL to the Control Plane server.
+
         Args:
             version (str): The version of the API to use. Set to ``auto`` to
                 automatically detect the server's version. Default: ``auto``
@@ -53,8 +84,15 @@ class CPLNClient:
 
             >>> import cpln
             >>> client = cpln.from_env()
+
+        Returns:
+            CPLNClient: A client configured from environment variables.
         """
-        return cls(**kwargs_from_env(**kwargs))
+        # Get configuration from environment variables
+        env_config = kwargs_from_env(**kwargs)
+
+        # Create a new client instance with the environment configuration
+        return cls(**env_config)
 
     @property
     def gvcs(self):

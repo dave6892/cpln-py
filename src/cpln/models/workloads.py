@@ -51,6 +51,17 @@ class Workload(Model):
     ) -> None:
         """
         Clone the workload.
+        
+        Args:
+            name (str): The name of the new workload.
+            gvc (str, optional): The GVC to create the workload in. Defaults to None.
+            workload_type (str, optional): The type of workload to create. Defaults to None.
+                
+        Returns:
+            None
+        
+        Raises:
+            Exception: If the API returns a non-2xx status code.
         """
         metadata = self.export()
 
@@ -67,6 +78,16 @@ class Workload(Model):
 
         if workload_type is not None:
             metadata['spec']['type'] = workload_type
+            
+            # Ensure defaultOptions exists
+            if 'defaultOptions' not in metadata['spec']:
+                metadata['spec']['defaultOptions'] = {}
+                
+            # Ensure autoscaling exists
+            if 'autoscaling' not in metadata['spec']['defaultOptions']:
+                metadata['spec']['defaultOptions']['autoscaling'] = {}
+                
+            # Set autoscaling metric and capacityAI
             metadata['spec']['defaultOptions']['autoscaling']['metric'] = "cpu"
             metadata['spec']['defaultOptions']['capacityAI'] = False
 
