@@ -5,14 +5,15 @@ from cpln.api.config import APIConfig
 from cpln.config import WorkloadConfig
 from cpln.utils.websocket import WebSocketAPI
 from cpln.errors import WebSocketExitCodeError
+from typing import Dict, Any, List, Optional, Union, cast
 
 
 class TestWorkloadDeploymentMixin:
     """Tests for the WorkloadDeploymentMixin class"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up the test"""
-        self.mixin = WorkloadDeploymentMixin()
+        self.mixin: WorkloadDeploymentMixin = WorkloadDeploymentMixin()
         self.mixin._get = MagicMock()
         self.mixin.config = MagicMock(spec=APIConfig)
         self.mixin.config.token = "test-token"
@@ -23,15 +24,15 @@ class TestWorkloadDeploymentMixin:
             "org": "test-org"
         }
 
-        self.config = WorkloadConfig(
+        self.config: WorkloadConfig = WorkloadConfig(
             gvc='test-gvc',
             workload_id='test-workload',
             location='test-location'
         )
 
-    def test_get_workload_deployment(self):
+    def test_get_workload_deployment(self) -> None:
         """Test get_workload_deployment method"""
-        deployment_data = {
+        deployment_data: Dict[str, Any] = {
             "status": {
                 "remote": "https://test-remote",
                 "versions": [
@@ -50,20 +51,20 @@ class TestWorkloadDeploymentMixin:
         self.mixin._get.assert_called_once_with('gvc/test-gvc/workload/test-workload/deployment/test-location')
         assert result == deployment_data
 
-    def test_get_workload_deployment_invalid_config(self):
+    def test_get_workload_deployment_invalid_config(self) -> None:
         """Test get_workload_deployment with invalid config"""
-        invalid_config = WorkloadConfig(gvc='test-gvc', workload_id=None)
+        invalid_config: WorkloadConfig = WorkloadConfig(gvc='test-gvc', workload_id=None)
 
         with pytest.raises(ValueError, match="Config not set properly"):
             self.mixin.get_workload_deployment(invalid_config)
 
     @patch.object(WorkloadDeploymentMixin, '__new__')
-    def test_get_remote_api(self, mock_new):
+    def test_get_remote_api(self, mock_new: patch) -> None:
         """Test get_remote_api method"""
-        api_config = APIConfig(base_url="https://api.cpln.io", org="test-org", token="test-token")
+        api_config: APIConfig = APIConfig(base_url="https://api.cpln.io", org="test-org", token="test-token")
 
         # Mock instance returned by __new__
-        mock_instance = MagicMock()
+        mock_instance: MagicMock = MagicMock()
         mock_instance.get_remote.return_value = "https://test-remote"
         mock_new.return_value = mock_instance
 
@@ -77,9 +78,9 @@ class TestWorkloadDeploymentMixin:
         # The result should be the mock_instance
         assert result is mock_instance
 
-    def test_get_remote(self):
+    def test_get_remote(self) -> None:
         """Test get_remote method"""
-        deployment_data = {
+        deployment_data: Dict[str, Any] = {
             "status": {
                 "remote": "https://test-remote"
             }
@@ -91,7 +92,7 @@ class TestWorkloadDeploymentMixin:
         self.mixin.get_workload_deployment.assert_called_once_with(self.config)
         assert result == "https://test-remote"
 
-    def test_get_remote_wss(self):
+    def test_get_remote_wss(self) -> None:
         """Test get_remote_wss method"""
         self.mixin.get_remote = MagicMock(return_value="https://test-remote")
 
@@ -100,10 +101,10 @@ class TestWorkloadDeploymentMixin:
         self.mixin.get_remote.assert_called_once_with(self.config)
         assert result == "wss://test-remote/remote"
 
-    def test_get_replicas(self):
+    def test_get_replicas(self) -> None:
         """Test get_replicas method"""
         # Mock the remote API client
-        mock_remote_api = MagicMock()
+        mock_remote_api: MagicMock = MagicMock()
         mock_remote_api._get.return_value = {"items": ["replica1", "replica2"]}
         self.mixin.get_remote_api = MagicMock(return_value=mock_remote_api)
 
@@ -113,9 +114,9 @@ class TestWorkloadDeploymentMixin:
         mock_remote_api._get.assert_called_once_with("/gvc/test-gvc/workload/test-workload")
         assert result == ["replica1", "replica2"]
 
-    def test_get_containers(self):
+    def test_get_containers(self) -> None:
         """Test get_containers method"""
-        deployment_data = {
+        deployment_data: Dict[str, Any] = {
             "status": {
                 "versions": [
                     {
@@ -140,9 +141,9 @@ class TestWorkloadDeploymentMixin:
 class TestWorkloadApiMixin:
     """Tests for the WorkloadApiMixin class"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up the test"""
-        self.mixin = WorkloadApiMixin()
+        self.mixin: WorkloadApiMixin = WorkloadApiMixin()
         self.mixin._get = MagicMock()
         self.mixin._post = MagicMock()
         self.mixin._delete = MagicMock()
@@ -158,13 +159,13 @@ class TestWorkloadApiMixin:
         self.mixin.config.token = "test-token"
         self.mixin.config.org = "test-org"
 
-        self.config = WorkloadConfig(
+        self.config: WorkloadConfig = WorkloadConfig(
             gvc='test-gvc',
             workload_id='test-workload',
             location='test-location'
         )
 
-    def test_get_workload_with_id(self):
+    def test_get_workload_with_id(self) -> None:
         """Test get_workload method with workload ID"""
         self.mixin._get.return_value = {"name": "test-workload"}
 
@@ -173,9 +174,9 @@ class TestWorkloadApiMixin:
         self.mixin._get.assert_called_once_with('gvc/test-gvc/workload/test-workload')
         assert result == {"name": "test-workload"}
 
-    def test_get_workload_without_id(self):
+    def test_get_workload_without_id(self) -> None:
         """Test get_workload method without workload ID"""
-        config = WorkloadConfig(gvc='test-gvc')
+        config: WorkloadConfig = WorkloadConfig(gvc='test-gvc')
         self.mixin._get.return_value = {"items": [{"name": "workload1"}, {"name": "workload2"}]}
 
         result = self.mixin.get_workload(config)
@@ -183,10 +184,10 @@ class TestWorkloadApiMixin:
         self.mixin._get.assert_called_once_with('gvc/test-gvc/workload')
         assert result == {"items": [{"name": "workload1"}, {"name": "workload2"}]}
 
-    def test_create_workload(self):
+    def test_create_workload(self) -> None:
         """Test create_workload method"""
-        metadata = {"name": "new-workload", "description": "Test workload"}
-        mock_response = Mock()
+        metadata: Dict[str, str] = {"name": "new-workload", "description": "Test workload"}
+        mock_response: Mock = Mock()
         self.mixin._post.return_value = mock_response
 
         result = self.mixin.create_workload(self.config, metadata)
@@ -194,9 +195,9 @@ class TestWorkloadApiMixin:
         self.mixin._post.assert_called_once_with('gvc/test-gvc/workload', data=metadata)
         assert result == mock_response
 
-    def test_delete_workload(self):
+    def test_delete_workload(self) -> None:
         """Test delete_workload method"""
-        mock_response = Mock()
+        mock_response: Mock = Mock()
         self.mixin._delete.return_value = mock_response
 
         result = self.mixin.delete_workload(self.config)
@@ -204,10 +205,10 @@ class TestWorkloadApiMixin:
         self.mixin._delete.assert_called_once_with('gvc/test-gvc/workload/test-workload')
         assert result == mock_response
 
-    def test_patch_workload(self):
+    def test_patch_workload(self) -> None:
         """Test patch_workload method"""
-        data = {"spec": {"defaultOptions": {"suspend": "true"}}}
-        mock_response = Mock()
+        data: Dict[str, Any] = {"spec": {"defaultOptions": {"suspend": "true"}}}
+        mock_response: Mock = Mock()
         self.mixin._patch.return_value = mock_response
 
         result = self.mixin.patch_workload(self.config, data)
@@ -216,10 +217,10 @@ class TestWorkloadApiMixin:
         assert result == mock_response
 
     @patch('cpln.api.workload.WebSocketAPI')
-    def test_exec_workload(self, mock_websocket_api):
+    def test_exec_workload(self, mock_websocket_api: patch) -> None:
         """Test exec_workload method"""
-        command = "echo 'Hello, World!'"
-        mock_instance = Mock()
+        command: str = "echo 'Hello, World!'"
+        mock_instance: Mock = Mock()
         mock_websocket_api.return_value = mock_instance
         mock_instance.exec.return_value = {"output": "Hello, World!"}
 

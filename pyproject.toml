@@ -36,7 +36,17 @@ docs = [
 lint = [
     "flake8>=7.2.0",
     "black>=25.1.0",
+    "mypy>=1.9.0",
+    "types-requests>=2.31.0.1",
 ]
+
+[tool.mypy]
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_optional = true
 
 
 [build-system]
@@ -46,6 +56,8 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
+package-dir = "src/cpln"
+include = ["py.typed"]
 
 [tool.pdm.version]
 source = "scm"
@@ -63,4 +75,6 @@ dev = [
     "mkdocs>=1.6.1",
     "mkdocstrings-python>=1.16.12",
     "mkdocs-autorefs>=1.4.2",
+    "mypy>=1.9.0",
+    "types-requests>=2.31.0.1",
 ]

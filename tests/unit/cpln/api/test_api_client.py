@@ -22,7 +22,7 @@ def test_api_client_get_gvc(mock_api_client):
     # Mock response is already set up in the fixture
     mock_api_client._mock_get_response.status_code = 200
     mock_api_client._mock_get_response.json.return_value = {"data": "test"}
-    
+
     # Call the API method
     result = mock_api_client.get_gvc()
 

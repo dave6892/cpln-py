@@ -8,7 +8,7 @@ def test_cpln_client_initialization(mock_cpln_client):
     assert mock_cpln_client.api.config.org == os.getenv('CPLN_ORG')
     assert mock_cpln_client.api.config.token == os.getenv('CPLN_TOKEN')
 
-def test_cpln_client_from_env():
+def test_cpln_client_from_env() -> None:
     with patch('cpln.utils.kwargs_from_env') as mock_kwargs:
         mock_kwargs.return_value = {
             'base_url': os.getenv('CPLN_BASE_URL'),
@@ -20,14 +20,14 @@ def test_cpln_client_from_env():
         assert client.api.config.org == os.getenv('CPLN_ORG')
         assert client.api.config.token == os.getenv('CPLN_TOKEN')
 
-def test_cpln_client_gvcs_property(mock_cpln_client):
+def test_cpln_client_gvcs_property(mock_cpln_client) -> None:
     gvcs = mock_cpln_client.gvcs
     assert gvcs.client == mock_cpln_client
 
-def test_cpln_client_images_property(mock_cpln_client):
+def test_cpln_client_images_property(mock_cpln_client) -> None:
     images = mock_cpln_client.images
     assert images.client == mock_cpln_client
 
-def test_cpln_client_workloads_property(mock_cpln_client):
+def test_cpln_client_workloads_property(mock_cpln_client) -> None:
     workloads = mock_cpln_client.workloads
     assert workloads.client == mock_cpln_client

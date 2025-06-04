@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from unittest.mock import Mock, patch, MagicMock
 import requests
+from typing import Dict, Generator, Any, Optional, MutableMapping
 from cpln.api.config import APIConfig
 from cpln.api.client import APIClient
 from cpln import CPLNClient
@@ -13,9 +14,9 @@ env_path = Path(__file__).parent.parent.parent.parent / '.env'
 load_dotenv(env_path)
 
 @pytest.fixture(autouse=True)
-def mock_env_vars():
+def mock_env_vars() -> Generator[None, None, None]:
     # Only override if not set in .env
-    env_vars = {
+    env_vars: Dict[str, str] = {
         'CPLN_TOKEN': os.getenv('CPLN_TOKEN', 'test-token'),
         'CPLN_ORG': os.getenv('CPLN_ORG', 'test-org'),
         'CPLN_BASE_URL': os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')
@@ -24,7 +25,7 @@ def mock_env_vars():
         yield
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> APIConfig:
     return APIConfig(
         base_url=os.getenv('CPLN_BASE_URL'),
         org=os.getenv('CPLN_ORG'),
@@ -32,31 +33,31 @@ def mock_config():
     )
 
 @pytest.fixture
-def mock_session():
+def mock_session() -> MagicMock:
     """
     Create a mock session with appropriate response behaviors.
     """
-    mock_session = MagicMock(spec=requests.Session)
+    mock_session: MagicMock = MagicMock(spec=requests.Session)
     
     # Set up default responses for HTTP methods
-    get_response = Mock()
+    get_response: Mock = Mock()
     get_response.status_code = 200
     get_response.json.return_value = {}
     mock_session.get.return_value = get_response
     
-    post_response = Mock()
+    post_response: Mock = Mock()
     post_response.status_code = 201
     post_response.json.return_value = {}
     post_response.text = "Created"
     mock_session.post.return_value = post_response
     
-    patch_response = Mock()
+    patch_response: Mock = Mock()
     patch_response.status_code = 200
     patch_response.json.return_value = {}
     patch_response.text = "OK"
     mock_session.patch.return_value = patch_response
     
-    delete_response = Mock()
+    delete_response: Mock = Mock()
     delete_response.status_code = 204
     delete_response.text = ""
     mock_session.delete.return_value = delete_response
@@ -65,7 +66,7 @@ def mock_session():
 
 
 @pytest.fixture
-def mock_api_client(mock_config, mock_session):
+def mock_api_client(mock_config: APIConfig, mock_session: MagicMock) -> Generator[APIClient, None, None]:
     """
     Create a properly mocked APIClient instance.
     
@@ -75,7 +76,7 @@ def mock_api_client(mock_config, mock_session):
     # Create a patcher for the requests.Session constructor
     with patch('requests.Session', return_value=mock_session):
         # Create an instance of APIClient with the mock config
-        client = APIClient(config=mock_config)
+        client: APIClient = APIClient(config=mock_config)
         
         # Make sure our session was properly set
         client.session = mock_session
@@ -83,7 +84,7 @@ def mock_api_client(mock_config, mock_session):
         yield client
 
 @pytest.fixture
-def mock_cpln_client(mock_api_client):
+def mock_cpln_client(mock_api_client: APIClient) -> Generator[CPLNClient, None, None]:
     """
     Create a properly mocked CPLNClient instance.
     
@@ -95,7 +96,7 @@ def mock_cpln_client(mock_api_client):
         # Mock the CPLNClient.__init__ method to avoid initialization issues
         with patch.object(CPLNClient, '__init__', return_value=None):
             # Create a CPLNClient instance
-            client = CPLNClient.__new__(CPLNClient)
+            client: CPLNClient = CPLNClient.__new__(CPLNClient)
             
             # Manually set the api attribute
             client.api = mock_api_client
