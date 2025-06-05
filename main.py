@@ -2,7 +2,7 @@ import time
 
 import cpln
 
-client = cpln.from_env()
+client = cpln.CPLNClient.from_env()
 client = cpln.CPLNClient(
     token=client.api.config.token,
     org=client.api.config.org,
