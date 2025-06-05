@@ -24,7 +24,8 @@ class Model:
             self.attrs = {}
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: {self.short_id} - {self.label}>"
+        short_id = self.short_id or "None"
+        return f"<{self.__class__.__name__}: {short_id} - {self.label}>"
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.id == other.id
@@ -44,6 +45,8 @@ class Model:
         """
         The ID of the object, truncated to 12 characters.
         """
+        if self.id is None:
+            return None
         return self.id[:12]
 
     @property

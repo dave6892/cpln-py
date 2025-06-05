@@ -81,4 +81,4 @@ class ImageCollection(Collection):
                 If the server returns an error.
         """
         resp = self.client.api.get_image()["items"]
-        return [self.get(image["name"]) for image in resp]
+        return [self.prepare_model(image) for image in resp]

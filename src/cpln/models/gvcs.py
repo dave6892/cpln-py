@@ -83,4 +83,4 @@ class GVCCollection(Collection):
                 If the server returns an error.
         """
         resp = self.client.api.get_gvc()["items"]
-        return [self.get(gvc["name"]) for gvc in resp]
+        return [self.prepare_model(gvc) for gvc in resp]
