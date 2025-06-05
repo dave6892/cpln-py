@@ -21,13 +21,11 @@ class TestWorkloadDeploymentMixin:
         self.mixin.config.asdict.return_value = {
             "base_url": "https://api.cpln.io",
             "token": "test-token",
-            "org": "test-org"
+            "org": "test-org",
         }
 
         self.config: WorkloadConfig = WorkloadConfig(
-            gvc='test-gvc',
-            workload_id='test-workload',
-            location='test-location'
+            gvc="test-gvc", workload_id="test-workload", location="test-location"
         )
 
     def test_get_workload_deployment(self) -> None:
@@ -35,33 +33,32 @@ class TestWorkloadDeploymentMixin:
         deployment_data: Dict[str, Any] = {
             "status": {
                 "remote": "https://test-remote",
-                "versions": [
-                    {
-                        "containers": {
-                            "container1": {},
-                            "container2": {}
-                        }
-                    }
-                ]
+                "versions": [{"containers": {"container1": {}, "container2": {}}}],
             }
         }
         self.mixin._get.return_value = deployment_data
         result = self.mixin.get_workload_deployment(self.config)
 
-        self.mixin._get.assert_called_once_with('gvc/test-gvc/workload/test-workload/deployment/test-location')
+        self.mixin._get.assert_called_once_with(
+            "gvc/test-gvc/workload/test-workload/deployment/test-location"
+        )
         assert result == deployment_data
 
     def test_get_workload_deployment_invalid_config(self) -> None:
         """Test get_workload_deployment with invalid config"""
-        invalid_config: WorkloadConfig = WorkloadConfig(gvc='test-gvc', workload_id=None)
+        invalid_config: WorkloadConfig = WorkloadConfig(
+            gvc="test-gvc", workload_id=None
+        )
 
         with pytest.raises(ValueError, match="Config not set properly"):
             self.mixin.get_workload_deployment(invalid_config)
 
-    @patch.object(WorkloadDeploymentMixin, '__new__')
+    @patch.object(WorkloadDeploymentMixin, "__new__")
     def test_get_remote_api(self, mock_new: patch) -> None:
         """Test get_remote_api method"""
-        api_config: APIConfig = APIConfig(base_url="https://api.cpln.io", org="test-org", token="test-token")
+        api_config: APIConfig = APIConfig(
+            base_url="https://api.cpln.io", org="test-org", token="test-token"
+        )
 
         # Mock instance returned by __new__
         mock_instance: MagicMock = MagicMock()
@@ -80,11 +77,7 @@ class TestWorkloadDeploymentMixin:
 
     def test_get_remote(self) -> None:
         """Test get_remote method"""
-        deployment_data: Dict[str, Any] = {
-            "status": {
-                "remote": "https://test-remote"
-            }
-        }
+        deployment_data: Dict[str, Any] = {"status": {"remote": "https://test-remote"}}
         self.mixin.get_workload_deployment = MagicMock(return_value=deployment_data)
 
         result = self.mixin.get_remote(self.config)
@@ -110,8 +103,12 @@ class TestWorkloadDeploymentMixin:
 
         result = self.mixin.get_replicas(self.config)
 
-        self.mixin.get_remote_api.assert_called_once_with(self.mixin.config, self.config)
-        mock_remote_api._get.assert_called_once_with("/gvc/test-gvc/workload/test-workload")
+        self.mixin.get_remote_api.assert_called_once_with(
+            self.mixin.config, self.config
+        )
+        mock_remote_api._get.assert_called_once_with(
+            "/gvc/test-gvc/workload/test-workload"
+        )
         assert result == ["replica1", "replica2"]
 
     def test_get_containers(self) -> None:
@@ -123,7 +120,7 @@ class TestWorkloadDeploymentMixin:
                         "containers": {
                             "container1": {},
                             "container2": {},
-                            "cpln-mounter": {}  # This should be ignored
+                            "cpln-mounter": {},  # This should be ignored
                         }
                     }
                 ]
@@ -160,9 +157,7 @@ class TestWorkloadApiMixin:
         self.mixin.config.org = "test-org"
 
         self.config: WorkloadConfig = WorkloadConfig(
-            gvc='test-gvc',
-            workload_id='test-workload',
-            location='test-location'
+            gvc="test-gvc", workload_id="test-workload", location="test-location"
         )
 
     def test_get_workload_with_id(self) -> None:
@@ -171,28 +166,33 @@ class TestWorkloadApiMixin:
 
         result = self.mixin.get_workload(self.config)
 
-        self.mixin._get.assert_called_once_with('gvc/test-gvc/workload/test-workload')
+        self.mixin._get.assert_called_once_with("gvc/test-gvc/workload/test-workload")
         assert result == {"name": "test-workload"}
 
     def test_get_workload_without_id(self) -> None:
         """Test get_workload method without workload ID"""
-        config: WorkloadConfig = WorkloadConfig(gvc='test-gvc')
-        self.mixin._get.return_value = {"items": [{"name": "workload1"}, {"name": "workload2"}]}
+        config: WorkloadConfig = WorkloadConfig(gvc="test-gvc")
+        self.mixin._get.return_value = {
+            "items": [{"name": "workload1"}, {"name": "workload2"}]
+        }
 
         result = self.mixin.get_workload(config)
 
-        self.mixin._get.assert_called_once_with('gvc/test-gvc/workload')
+        self.mixin._get.assert_called_once_with("gvc/test-gvc/workload")
         assert result == {"items": [{"name": "workload1"}, {"name": "workload2"}]}
 
     def test_create_workload(self) -> None:
         """Test create_workload method"""
-        metadata: Dict[str, str] = {"name": "new-workload", "description": "Test workload"}
+        metadata: Dict[str, str] = {
+            "name": "new-workload",
+            "description": "Test workload",
+        }
         mock_response: Mock = Mock()
         self.mixin._post.return_value = mock_response
 
         result = self.mixin.create_workload(self.config, metadata)
 
-        self.mixin._post.assert_called_once_with('gvc/test-gvc/workload', data=metadata)
+        self.mixin._post.assert_called_once_with("gvc/test-gvc/workload", data=metadata)
         assert result == mock_response
 
     def test_delete_workload(self) -> None:
@@ -202,7 +202,9 @@ class TestWorkloadApiMixin:
 
         result = self.mixin.delete_workload(self.config)
 
-        self.mixin._delete.assert_called_once_with('gvc/test-gvc/workload/test-workload')
+        self.mixin._delete.assert_called_once_with(
+            "gvc/test-gvc/workload/test-workload"
+        )
         assert result == mock_response
 
     def test_patch_workload(self) -> None:
@@ -213,10 +215,12 @@ class TestWorkloadApiMixin:
 
         result = self.mixin.patch_workload(self.config, data)
 
-        self.mixin._patch.assert_called_once_with('gvc/test-gvc/workload/test-workload', data=data)
+        self.mixin._patch.assert_called_once_with(
+            "gvc/test-gvc/workload/test-workload", data=data
+        )
         assert result == mock_response
 
-    @patch('cpln.api.workload.WebSocketAPI')
+    @patch("cpln.api.workload.WebSocketAPI")
     def test_exec_workload(self, mock_websocket_api: patch) -> None:
         """Test exec_workload method"""
         command: str = "echo 'Hello, World!'"
@@ -239,6 +243,6 @@ class TestWorkloadApiMixin:
             gvc="test-gvc",
             container="container1",
             pod="replica1",
-            command=["echo", "'Hello,", "World!'"]
+            command=["echo", "'Hello,", "World!'"],
         )
         assert result == {"output": "Hello, World!"}

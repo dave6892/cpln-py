@@ -1,0 +1,34 @@
+repos:
+- repo: https://github.com/pdm-project/pdm
+  rev: 2.10.3
+  hooks:
+    - id: pdm-export
+      # command arguments, e.g.:
+      args: ['-o', 'requirements.txt', '--without-hashes']
+      files: ^pdm.lock$
+# - repo: https://github.com/pdm-project/pdm
+#   rev: 2.10.3
+#   hooks:
+#     - id: pdm-lock-check
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v2.3.0
+  hooks:
+  -   id: check-yaml
+  -   id: trailing-whitespace
+- repo: https://github.com/psf/black
+  rev: 22.10.0
+  hooks:
+  - id: black
+    language_version: python3.11
+# - repo: https://github.com/PyCQA/flake8
+#   rev: 6.1.0
+#   hooks:
+#     - id: flake8
+# - repo: local
+#   hooks:
+#     - id: pytest-check
+#       name: pytest-check
+#       entry: pdm test
+#       language: system
+#       pass_filenames: false
+#       always_run: true

@@ -3,16 +3,12 @@ from websocket import WebSocketApp
 from ..errors import (
     WebSocketConnectionError,
     WebSocketExitCodeError,
-    WebSocketOperationError
+    WebSocketOperationError,
 )
-from .exit_codes import (
-    AwsExitCode,
-    GenericExitCode,
-    PostgresExitCode
-)
+from .exit_codes import AwsExitCode, GenericExitCode, PostgresExitCode
+
 
 class WebSocketAPI:
-
     def __init__(self, remote_wss: str):
         self.remote_wss = remote_wss
         self._request = None
@@ -32,10 +28,10 @@ class WebSocketAPI:
     def websocket(self):
         ws = WebSocketApp(
             self.remote_wss,
-            on_message = self._on_message,
-            on_error = self._on_error,
-            on_close = self._on_close,
-            on_open = self._on_open,
+            on_message=self._on_message,
+            on_error=self._on_error,
+            on_close=self._on_close,
+            on_open=self._on_open,
         )
         return ws
 
@@ -79,12 +75,16 @@ class WebSocketAPI:
 
             # Check for error messages
             if "error" in decoded_message.lower():
-                self._error = WebSocketOperationError(f"Error in message: {decoded_message}")
+                self._error = WebSocketOperationError(
+                    f"Error in message: {decoded_message}"
+                )
                 return
 
             # Check for failure messages
             if "failed" in decoded_message.lower():
-                self._error = WebSocketOperationError(f"Operation failed: {decoded_message}")
+                self._error = WebSocketOperationError(
+                    f"Operation failed: {decoded_message}"
+                )
                 return
 
             print(decoded_message)
@@ -98,7 +98,9 @@ class WebSocketAPI:
         self._error = WebSocketConnectionError(f"WebSocket error: {error}")
 
     def _on_close(self, ws: WebSocketApp, close_status_code: int, close_msg: str):
-        if not (close_status_code == 1000 or close_status_code is None):  # 1000 is normal closure
+        if not (
+            close_status_code == 1000 or close_status_code is None
+        ):  # 1000 is normal closure
             self._error = WebSocketConnectionError(
                 f"Connection closed unexpectedly with code {close_status_code}: {close_msg}"
             )
@@ -109,5 +111,7 @@ class WebSocketAPI:
         try:
             ws.send(json.dumps(self._request, indent=4))
         except Exception as e:
-            self._error = WebSocketConnectionError(f"Error sending initial request: {str(e)}")
+            self._error = WebSocketConnectionError(
+                f"Error sending initial request: {str(e)}"
+            )
             ws.sock.close()

@@ -1,8 +1,10 @@
 from enum import Enum
 from typing import Optional, Dict
 
+
 class GenericExitCode(Enum):
     """Enumeration of generic exit codes and their meanings."""
+
     SUCCESS = 0
     GENERAL_ERROR = 1
     INVALID_ARGUMENTS = 2
@@ -21,7 +23,7 @@ class GenericExitCode(Enum):
             cls.PERMISSION_DENIED.value: "Permission denied while executing the command.",
             cls.FILE_NOT_FOUND.value: "A required file or directory was not found.",
             cls.PROCESS_INTERRUPTED.value: "The process was interrupted by a signal.",
-            cls.UNKNOWN_ERROR.value: "An unknown error occurred while executing the command."
+            cls.UNKNOWN_ERROR.value: "An unknown error occurred while executing the command.",
         }
         return messages.get(code, f"Unknown exit code: {code}")
 
@@ -39,6 +41,6 @@ class GenericExitCode(Enum):
             cls.PERMISSION_DENIED.value: "Permission Denied",
             cls.FILE_NOT_FOUND.value: "File Not Found",
             cls.PROCESS_INTERRUPTED.value: "Process Interrupted",
-            cls.UNKNOWN_ERROR.value: "Unknown Error"
+            cls.UNKNOWN_ERROR.value: "Unknown Error",
         }
         return error_types.get(code)

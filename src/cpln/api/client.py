@@ -34,21 +34,17 @@ class APIClient(
             automatically detect the server's version. Default: ``1.0.0``
         timeout (int): Default timeout for API calls, in seconds.
     """
-    def __init__(self,
-        config: Optional[APIConfig] = None,
-        **kwargs
-    ):
+
+    def __init__(self, config: Optional[APIConfig] = None, **kwargs):
         super().__init__()
-        
+
         # Initialize the config object
         if config is None:
             config = APIConfig(**kwargs)
 
         self.config = config
 
-    def _get(self,
-        endpoint: str
-    ) -> Dict[str, Any]:
+    def _get(self, endpoint: str) -> Dict[str, Any]:
         """
         Makes a GET request to the specified API endpoint.
 
@@ -57,27 +53,22 @@ class APIClient(
 
         Returns:
             dict: The JSON response from the API
-            
+
         Raises:
             NotFound: If the resource is not found
             APIError: If the API returns an error
         """
-        resp = self.get(
-            f"{self.config.org_url}/{endpoint}",
-            headers = self._headers
-        )
-        
+        resp = self.get(f"{self.config.org_url}/{endpoint}", headers=self._headers)
+
         # Handle error responses
         if resp.status_code == 404:
             raise NotFound(f"Resource not found: {endpoint}")
         elif resp.status_code >= 400:
             raise APIError(f"API error ({resp.status_code}): {resp.text}")
-            
+
         return resp.json()
 
-    def _delete(self,
-        endpoint: str
-    ) -> requests.Response:
+    def _delete(self, endpoint: str) -> requests.Response:
         """
         Makes a DELETE request to the specified API endpoint.
 
@@ -86,27 +77,23 @@ class APIClient(
 
         Returns:
             requests.Response: The response object from the API
-            
+
         Raises:
             NotFound: If the resource is not found
             APIError: If the API returns an error
         """
-        resp = self.delete(
-            f"{self.config.org_url}/{endpoint}",
-            headers = self._headers
-        )
-        
+        resp = self.delete(f"{self.config.org_url}/{endpoint}", headers=self._headers)
+
         # Handle error responses
         if resp.status_code == 404:
             raise NotFound(f"Resource not found: {endpoint}")
         elif resp.status_code >= 400:
             raise APIError(f"API error ({resp.status_code}): {resp.text}")
-            
+
         return resp
 
-    def _post(self,
-        endpoint: str,
-        data: Optional[Dict[str, Any]] = None
+    def _post(
+        self, endpoint: str, data: Optional[Dict[str, Any]] = None
     ) -> requests.Response:
         """
         Makes a POST request to the specified API endpoint.
@@ -117,35 +104,34 @@ class APIClient(
 
         Returns:
             requests.Response: The response object from the API
-            
+
         Raises:
             APIError: If the API returns an error
         """
         resp = self.post(
             f"{self.config.org_url}/{endpoint}",
-            json = data,
-            headers = self._headers,
+            json=data,
+            headers=self._headers,
         )
-        
+
         # Handle error responses
         if resp.status_code >= 400:
             error_msg = f"API error ({resp.status_code})"
             try:
                 error_data = resp.json()
-                if isinstance(error_data, dict) and 'error' in error_data:
+                if isinstance(error_data, dict) and "error" in error_data:
                     error_msg = f"{error_msg}: {error_data['error']}"
                 else:
                     error_msg = f"{error_msg}: {resp.text}"
             except:
                 error_msg = f"{error_msg}: {resp.text}"
-                
+
             raise APIError(error_msg)
-            
+
         return resp
 
-    def _patch(self,
-        endpoint: str,
-        data: Optional[Dict[str, Any]] = None
+    def _patch(
+        self, endpoint: str, data: Optional[Dict[str, Any]] = None
     ) -> requests.Response:
         """
         Makes a PATCH request to the specified API endpoint.
@@ -156,28 +142,25 @@ class APIClient(
 
         Returns:
             requests.Response: The response object from the API
-            
+
         Raises:
             NotFound: If the resource is not found
             APIError: If the API returns an error
         """
         resp = self.patch(
             f"{self.config.org_url}/{endpoint}",
-            json = data,
-            headers = self._headers,
+            json=data,
+            headers=self._headers,
         )
-        
+
         # Handle error responses
         if resp.status_code == 404:
             raise NotFound(f"Resource not found: {endpoint}")
         elif resp.status_code >= 400:
             raise APIError(f"API error ({resp.status_code}): {resp.text}")
-            
+
         return resp
 
-    
     @property
     def _headers(self):
-        return {
-            "Authorization": f"Bearer {self.config.token}"
-        }
+        return {"Authorization": f"Bearer {self.config.token}"}

@@ -30,10 +30,7 @@ class GVC(Model):
                 If the server returns an error.
         """
         print(f"Creating GVC: {self}")
-        self.client.api.create_gvc(
-            self.attrs["name"],
-            self.attrs["description"]
-        )
+        self.client.api.create_gvc(self.attrs["name"], self.attrs["description"])
         print("Created!")
 
     def delete(self) -> None:
@@ -53,6 +50,7 @@ class GVCCollection(Collection):
     """
     GVCs on the server.
     """
+
     model = GVC
 
     def get(self, name: str):
@@ -71,9 +69,7 @@ class GVCCollection(Collection):
             :py:class:`cpln.errors.APIError`
                 If the server returns an error.
         """
-        return self.prepare_model(
-            self.client.api.get_gvc(name)
-        )
+        return self.prepare_model(self.client.api.get_gvc(name))
 
     def list(self):
         """

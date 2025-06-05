@@ -1,8 +1,10 @@
 from enum import Enum
 from typing import Optional, Dict
 
+
 class AwsExitCode(Enum):
     """Enumeration of common exit codes and their meanings."""
+
     SUCCESS = 0
     CONFIG_ERROR = 1
     PARSE_ERROR = 2
@@ -23,7 +25,7 @@ class AwsExitCode(Enum):
             cls.INVALID_SYNTAX.value: "Command syntax was invalid, an unknown parameter was provided, or a parameter value was incorrect and prevented the command from running.",
             cls.INVALID_ENV.value: "The system environment or configuration was invalid. While the command provided may be syntactically valid, missing configuration or credentials prevented the command from running.",
             cls.SERVICE_ERROR.value: "The command was successfully parsed and a request was made to the specified service but the service returned an error. This will generally indicate incorrect API usage or other service specific issues.",
-            cls.GENERAL_ERROR.value: "General catch-all error. The command may have parsed correctly but an unspecified runtime error occurred when running the command."
+            cls.GENERAL_ERROR.value: "General catch-all error. The command may have parsed correctly but an unspecified runtime error occurred when running the command.",
         }
         return messages.get(code, f"Unknown exit code: {code}")
 
@@ -42,6 +44,6 @@ class AwsExitCode(Enum):
             cls.INVALID_SYNTAX.value: "Syntax Error",
             cls.INVALID_ENV.value: "Environment Error",
             cls.SERVICE_ERROR.value: "Service Error",
-            cls.GENERAL_ERROR.value: "General Error"
+            cls.GENERAL_ERROR.value: "General Error",
         }
         return error_types.get(code)

@@ -1,13 +1,11 @@
-from .resource import (
-    Collection,
-    Model
-)
+from .resource import Collection, Model
 
 
 class Image(Model):
     """
     An image on the server.
     """
+
     def get(self) -> dict[str, any]:
         """
         Get the image.
@@ -40,6 +38,7 @@ class ImageCollection(Collection):
     """
     Images on the server.
     """
+
     model = Image
 
     def get(self, image_id: str):
@@ -58,9 +57,7 @@ class ImageCollection(Collection):
             :py:class:`docker.errors.APIError`
                 If the server returns an error.
         """
-        return self.prepare_model(
-            self.client.api.get_image(image_id)
-        )
+        return self.prepare_model(self.client.api.get_image(image_id))
 
     def list(self):
         """

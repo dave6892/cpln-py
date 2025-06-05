@@ -2,8 +2,9 @@ class Model:
     """
     A base class for representing a single object on the server.
     """
-    id_attribute = 'id'
-    label_attribute = 'name'
+
+    id_attribute = "id"
+    label_attribute = "name"
 
     def __init__(self, attrs=None, client=None, collection=None, state=None):
         #: A client pointing at the server that this object is on.
@@ -96,6 +97,8 @@ class Collection:
             attrs.state = state
             return attrs
         elif isinstance(attrs, dict):
-            return self.model(attrs=attrs, client=self.client, collection=self, state=state)
+            return self.model(
+                attrs=attrs, client=self.client, collection=self, state=state
+            )
         else:
             raise Exception(f"Can't create {self.model.__name__} from {attrs}")

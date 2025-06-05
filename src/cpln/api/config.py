@@ -1,12 +1,10 @@
-from dataclasses import (
-    dataclass,
-    asdict
-)
+from dataclasses import dataclass, asdict
 from ..constants import (
     DEFAULT_CPLN_API_URL,
     DEFAULT_CPLN_API_VERSION,
     DEFAULT_TIMEOUT_SECONDS,
 )
+
 
 @dataclass
 class APIConfig:
@@ -24,6 +22,7 @@ class APIConfig:
         timeout (int, optional): Request timeout in seconds. Defaults to DEFAULT_TIMEOUT_SECONDS
         org_url (str, optional): Organization-specific API URL. Will be automatically set based on base_url and org
     """
+
     token: str
     org: str
     base_url: str = DEFAULT_CPLN_API_URL
