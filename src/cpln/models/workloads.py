@@ -1,10 +1,9 @@
-import json
 from typing import Optional
-from .resource import Collection, Model
-from ..api import APIClient
+
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
 from ..utils import get_default_workload_template, load_template
+from .resource import Collection, Model
 
 
 class Workload(Model):
@@ -136,7 +135,7 @@ class Workload(Model):
             (dict): The response from the server containing status, message, and exit code.
         """
         try:
-            response = self.exec(
+            self.exec(
                 ["echo", "ping"],
                 location=location,
             )

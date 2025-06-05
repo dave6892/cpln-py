@@ -1,10 +1,11 @@
-import pytest
 import os
+
+import pytest
 from cpln.api.config import APIConfig
 from cpln.constants import (
+    DEFAULT_CPLN_API_URL,
     DEFAULT_CPLN_API_VERSION,
     DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_CPLN_API_URL,
 )
 
 

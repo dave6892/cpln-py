@@ -1,11 +1,10 @@
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import patch, Mock, MagicMock
-from cpln.api.workload import WorkloadApiMixin, WorkloadDeploymentMixin
 from cpln.api.config import APIConfig
+from cpln.api.workload import WorkloadApiMixin, WorkloadDeploymentMixin
 from cpln.config import WorkloadConfig
-from cpln.utils.websocket import WebSocketAPI
-from cpln.errors import WebSocketExitCodeError
-from typing import Dict, Any, List, Optional, Union, cast
 
 
 class TestWorkloadDeploymentMixin:

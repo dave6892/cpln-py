@@ -85,15 +85,3 @@ class WorkloadStatus:
     ready: bool
     readyCheckTimestamp: str
     readyLatest: bool
-
-
-@dataclass
-class WorkloadStatus:
-    canonicalEndpoint: str
-    endpoint: str
-    internalName: str
-    loadBalancer: list[str]
-    parentId: str
-    ready: bool
-    readyCheckTimestamp: str
-    readyLatest: bool

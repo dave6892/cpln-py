@@ -1,13 +1,14 @@
-import unittest
-from unittest.mock import MagicMock, patch
 import json
-from typing import Dict, Any, Optional, Union, List, cast
-from cpln.utils.websocket import WebSocketAPI
+import unittest
+from typing import Dict, List
+from unittest.mock import MagicMock, patch
+
 from cpln.errors import (
     WebSocketConnectionError,
     WebSocketExitCodeError,
     WebSocketOperationError,
 )
+from cpln.utils.websocket import WebSocketAPI
 
 
 class TestWebSocketAPI(unittest.TestCase):

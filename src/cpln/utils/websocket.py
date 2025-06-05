@@ -1,5 +1,7 @@
 import json
+
 from websocket import WebSocketApp
+
 from ..errors import (
     WebSocketConnectionError,
     WebSocketExitCodeError,

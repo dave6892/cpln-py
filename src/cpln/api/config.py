@@ -1,4 +1,5 @@
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+
 from ..constants import (
     DEFAULT_CPLN_API_URL,
     DEFAULT_CPLN_API_VERSION,

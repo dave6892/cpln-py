@@ -1,7 +1,9 @@
-import os
 import json
+import os
 from typing import Any
+
 from dotenv import load_dotenv
+
 from ..constants import DEFAULT_CPLN_API_URL
 
 load_dotenv()
@@ -33,11 +35,8 @@ def kwargs_from_env(environment=None):
 
 
 def load_template(template_path: str) -> dict[str, Any]:
-    with open(template_path, "r") as file:
+    with open(template_path) as file:
         return json.load(file)
-
-
-import os
 
 
 def get_default_workload_template(workload_type: str) -> dict[str, Any]:

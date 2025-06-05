@@ -1,11 +1,10 @@
-from dataclasses import dataclass
 from typing import (
     Any,
 )
-from .config import APIConfig
+
 from ..config import WorkloadConfig
 from ..utils import WebSocketAPI
-
+from .config import APIConfig
 
 IGNORED_CONTAINERS = ["cpln-mounter"]
 
@@ -198,13 +197,13 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
         containers = self.get_containers(config)
         replicas = self.get_replicas(config)
         remote_wss = self.get_remote_wss(config)
-        request = dict(
-            token=self.config.token,
-            org=self.config.org,
-            gvc=config.gvc,
-            container=containers[-1],
-            pod=replicas[-1],
-            command=command.split(" ") if isinstance(command, str) else command,
-        )
+        request = {
+            "token": self.config.token,
+            "org": self.config.org,
+            "gvc": config.gvc,
+            "container": containers[-1],
+            "pod": replicas[-1],
+            "command": command.split(" ") if isinstance(command, str) else command,
+        }
         websocket_api = WebSocketAPI(remote_wss)
         return websocket_api.exec(**request)

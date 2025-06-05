@@ -1,8 +1,8 @@
-import pytest
 import os
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+
+import pytest
 import requests
-from typing import Any, cast
 from cpln.api.client import APIClient
 from cpln.api.config import APIConfig
 
@@ -74,15 +74,15 @@ def mock_api_client(mock_config: Mock) -> APIClient:
     client.delete = mock_delete  # type: ignore
 
     # Store mocks on the client for access in tests
-    setattr(client, "_mock_get", mock_get)
-    setattr(client, "_mock_post", mock_post)
-    setattr(client, "_mock_patch", mock_patch)
-    setattr(client, "_mock_delete", mock_delete)
+    client._mock_get = mock_get
+    client._mock_post = mock_post
+    client._mock_patch = mock_patch
+    client._mock_delete = mock_delete
 
     # Store responses for direct access in tests
-    setattr(client, "_mock_get_response", mock_get_response)
-    setattr(client, "_mock_post_response", mock_post_response)
-    setattr(client, "_mock_patch_response", mock_patch_response)
-    setattr(client, "_mock_delete_response", mock_delete_response)
+    client._mock_get_response = mock_get_response
+    client._mock_post_response = mock_post_response
+    client._mock_patch_response = mock_patch_response
+    client._mock_delete_response = mock_delete_response
 
     return client

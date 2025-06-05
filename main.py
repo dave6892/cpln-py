@@ -1,12 +1,6 @@
 import time
-import cpln
-from cpln.errors import (
-    APIError,
-    WebSocketExitCodeError,
-    WebSocketOperationError,
-    WebSocketConnectionError,
-)
 
+import cpln
 
 client = cpln.from_env()
 client = cpln.CPLNClient(

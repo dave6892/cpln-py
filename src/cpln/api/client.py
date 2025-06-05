@@ -1,4 +1,8 @@
 from typing import Any, Dict, Optional
+
+import requests
+
+from ..errors import APIError, NotFound
 from .config import APIConfig
 from .gvc import GVCApiMixin
 from .image import ImageApiMixin
@@ -6,8 +10,6 @@ from .workload import (
     WorkloadApiMixin,
     WorkloadDeploymentMixin,
 )
-import requests
-from ..errors import APIError, NotFound
 
 
 class APIClient(
@@ -123,7 +125,7 @@ class APIClient(
                     error_msg = f"{error_msg}: {error_data['error']}"
                 else:
                     error_msg = f"{error_msg}: {resp.text}"
-            except:
+            except (ValueError, KeyError):
                 error_msg = f"{error_msg}: {resp.text}"
 
             raise APIError(error_msg)

@@ -1,12 +1,11 @@
-import pytest
 import os
 from unittest.mock import patch
-from cpln.utils import kwargs_from_env
+
+import pytest
 from cpln.constants import (
-    DEFAULT_CPLN_API_VERSION,
-    DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_CPLN_API_URL,
 )
+from cpln.utils import kwargs_from_env
 
 CPLN_TOKEN = os.getenv("CPLN_TOKEN")
 CPLN_ORG = os.getenv("CPLN_ORG")
@@ -40,18 +39,23 @@ def test_kwargs_from_env_all_variables():
 
 
 def test_kwargs_from_env_missing_required():
+    with (
+        patch.dict(os.environ, {"CPLN_TOKEN": "", "CPLN_ORG": ""}),
+        pytest.raises(ValueError),
+    ):
+        kwargs_from_env()
 
-    with patch.dict(os.environ, {"CPLN_TOKEN": "", "CPLN_ORG": ""}):
-        with pytest.raises(ValueError):
-            kwargs_from_env()
+    with (
+        patch.dict(os.environ, {"CPLN_TOKEN": "test-token", "CPLN_ORG": ""}),
+        pytest.raises(ValueError),
+    ):
+        kwargs_from_env()
 
-    with patch.dict(os.environ, {"CPLN_TOKEN": "test-token", "CPLN_ORG": ""}):
-        with pytest.raises(ValueError):
-            kwargs_from_env()
-
-    with patch.dict(os.environ, {"CPLN_ORG": "test-org", "CPLN_TOKEN": ""}):
-        with pytest.raises(ValueError):
-            kwargs_from_env()
+    with (
+        patch.dict(os.environ, {"CPLN_ORG": "test-org", "CPLN_TOKEN": ""}),
+        pytest.raises(ValueError),
+    ):
+        kwargs_from_env()
 
 
 def test_kwargs_from_env_custom_environment():

@@ -1,9 +1,10 @@
 import unittest
-from typing import Dict, List, Any, Optional
-from unittest.mock import MagicMock, patch, Mock
-from cpln.models.workloads import Workload, WorkloadCollection
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
 from cpln.config import WorkloadConfig
 from cpln.errors import WebSocketExitCodeError
+from cpln.models.workloads import Workload, WorkloadCollection
 from requests import Response
 
 
@@ -222,7 +223,7 @@ class TestWorkload(unittest.TestCase):
         self.client.api.create_workload.return_value = mock_response
 
         # Call the clone method and expect an exception
-        with self.assertRaises(Exception):
+        with self.assertRaises((RuntimeError, ValueError)):
             self.workload.clone(name=new_name)
 
 

@@ -1,10 +1,9 @@
-import pytest
 import os
-from unittest.mock import Mock, patch, MagicMock
-import requests
+from unittest.mock import Mock
+
+import pytest
 from cpln.api.client import APIClient
-from cpln.api.config import APIConfig
-from cpln.errors import NotFound, APIError
+from cpln.errors import APIError, NotFound
 
 
 def test_api_client_initialization(mock_config):

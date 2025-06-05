@@ -1,4 +1,5 @@
-from typing import Dict, Optional, Any
+from typing import Optional
+
 from .api import APIClient
 from .models import GVCCollection, ImageCollection, WorkloadCollection
 from .utils import kwargs_from_env
@@ -25,7 +26,7 @@ class CPLNClient:
         base_url: Optional[str] = None,
         org: Optional[str] = None,
         token: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize a CPLNClient.

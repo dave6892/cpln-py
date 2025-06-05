@@ -1,14 +1,11 @@
 import unittest
+from typing import Any, Dict, List, Tuple, cast
 from unittest.mock import MagicMock, Mock, patch
-import os
-import pytest
-import requests
-from requests import Response
-from typing import Dict, List, Any, Optional, Union, Tuple, cast
 
-from cpln.models.workloads import Workload, WorkloadCollection
 from cpln.config import WorkloadConfig
 from cpln.errors import WebSocketExitCodeError
+from cpln.models.workloads import Workload, WorkloadCollection
+from requests import Response
 
 
 class TestWorkload(unittest.TestCase):
@@ -120,9 +117,11 @@ class TestWorkload(unittest.TestCase):
         self.client.api.exec_workload.side_effect = error
 
         # Mock print to avoid output during test
-        with patch("builtins.print"):
-            with self.assertRaises(WebSocketExitCodeError):
-                self.workload.exec(command, location)
+        with (
+            patch("builtins.print"),
+            self.assertRaises(WebSocketExitCodeError),
+        ):
+            self.workload.exec(command, location)
 
         self.client.api.exec_workload.assert_called_once_with(
             config=self.workload.config(location=location), command=command
@@ -409,10 +408,11 @@ class TestWorkload(unittest.TestCase):
         self.client.api.create_workload.return_value = mock_response
 
         # Mock print to avoid output during test
-        with patch("builtins.print"):
-            # Call clone method should raise exception
-            with self.assertRaises(Exception):
-                self.workload.clone(name=new_name)
+        with (
+            patch("builtins.print"),
+            self.assertRaises((RuntimeError, ValueError)),
+        ):
+            self.workload.clone(name=new_name)
 
         # Verify API call was attempted
         self.client.api.create_workload.assert_called_once()

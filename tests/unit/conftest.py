@@ -1,13 +1,14 @@
-import pytest
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-from unittest.mock import Mock, patch, MagicMock
+from typing import Dict, Generator
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 import requests
-from typing import Dict, Generator, Any, Optional, MutableMapping
-from cpln.api.config import APIConfig
-from cpln.api.client import APIClient
 from cpln import CPLNClient
+from cpln.api.client import APIClient
+from cpln.api.config import APIConfig
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
@@ -98,13 +99,14 @@ def mock_cpln_client(mock_api_client: APIClient) -> Generator[CPLNClient, None, 
     when CPLNClient creates it.
     """
     # Create a patch for the APIClient constructor
-    with patch("cpln.client.APIClient", return_value=mock_api_client):
-        # Mock the CPLNClient.__init__ method to avoid initialization issues
-        with patch.object(CPLNClient, "__init__", return_value=None):
-            # Create a CPLNClient instance
-            client: CPLNClient = CPLNClient.__new__(CPLNClient)
+    with (
+        patch("cpln.client.APIClient", return_value=mock_api_client),
+        patch.object(CPLNClient, "__init__", return_value=None),
+    ):
+        # Create a CPLNClient instance
+        client: CPLNClient = CPLNClient.__new__(CPLNClient)
 
-            # Manually set the api attribute
-            client.api = mock_api_client
+        # Manually set the api attribute
+        client.api = mock_api_client
 
-            yield client
+        yield client
