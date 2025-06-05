@@ -2,9 +2,8 @@ class ImageApiMixin:
     """
     A mixin class that provides image-related API methods.
     """
-    def get_image(self,
-        image_id: str = None
-    ):
+
+    def get_image(self, image_id: str = None):
         """
         Retrieves image information from the Control Plane API.
 
@@ -18,9 +17,9 @@ class ImageApiMixin:
         Raises:
             APIError: If the request fails
         """
-        endpoint = 'image'
+        endpoint = "image"
         if image_id:
-            endpoint += f'/{image_id}'
+            endpoint += f"/{image_id}"
         return self._get(endpoint)
 
     def delete_image(self, image_id):
@@ -36,4 +35,4 @@ class ImageApiMixin:
         Raises:
             APIError: If the request fails
         """
-        return self._delete(f'image/{image_id}')
+        return self._delete(f"image/{image_id}")

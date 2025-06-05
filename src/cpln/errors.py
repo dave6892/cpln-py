@@ -1,5 +1,6 @@
 import requests
 
+
 class CPLNException(Exception):
     """
     A base class from which all other exceptions inherit.
@@ -13,6 +14,7 @@ class APIError(requests.exceptions.HTTPError, CPLNException):
     """
     An HTTP error from the API.
     """
+
     def __init__(self, message, response=None, explanation=None):
         # requests 1.2 supports response as a keyword argument, but
         # requests 1.1 doesn't
@@ -25,14 +27,14 @@ class APIError(requests.exceptions.HTTPError, CPLNException):
 
         if self.is_client_error():
             message = (
-                f'{self.response.status_code} Client Error for '
-                f'{self.response.url}: {self.response.reason}'
+                f"{self.response.status_code} Client Error for "
+                f"{self.response.url}: {self.response.reason}"
             )
 
         elif self.is_server_error():
             message = (
-                f'{self.response.status_code} Server Error for '
-                f'{self.response.url}: {self.response.reason}'
+                f"{self.response.status_code} Server Error for "
+                f"{self.response.url}: {self.response.reason}"
             )
 
         if self.explanation:
@@ -107,8 +109,7 @@ class MissingContextParameter(CPLNException):
         self.param = param
 
     def __str__(self):
-        return (f"missing parameter: {self.param}")
-
+        return f"missing parameter: {self.param}"
 
 
 class ContextException(CPLNException):
@@ -116,7 +117,7 @@ class ContextException(CPLNException):
         self.msg = msg
 
     def __str__(self):
-        return (self.msg)
+        return self.msg
 
 
 class ContextNotFound(CPLNException):
@@ -124,25 +125,34 @@ class ContextNotFound(CPLNException):
         self.name = name
 
     def __str__(self):
-        return (f"context '{self.name}' not found")
+        return f"context '{self.name}' not found"
 
 
 class WebSocketError(Exception):
     """Base class for all WebSocket-related errors."""
+
     pass
+
 
 class WebSocketConnectionError(WebSocketError):
     """Raised when there are issues with the WebSocket connection."""
+
     pass
+
 
 class WebSocketMessageError(WebSocketError):
     """Raised when there are issues with the WebSocket message content."""
+
     pass
+
 
 class WebSocketExitCodeError(WebSocketMessageError):
     """Raised when the WebSocket message indicates a non-zero exit code."""
+
     pass
+
 
 class WebSocketOperationError(WebSocketMessageError):
     """Raised when the WebSocket message indicates an operation error."""
+
     pass

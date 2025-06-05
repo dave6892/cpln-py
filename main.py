@@ -1,14 +1,8 @@
 import time
+
 import cpln
-from cpln.errors import (
-    APIError,
-    WebSocketExitCodeError,
-    WebSocketOperationError,
-    WebSocketConnectionError,
-)
 
-
-client = cpln.from_env()
+client = cpln.CPLNClient.from_env()
 client = cpln.CPLNClient(
     token=client.api.config.token,
     org=client.api.config.org,
@@ -24,10 +18,10 @@ print("images in my control plane:")
 for image in client.images.list():
     print(image)
 
-gvc = 'apalis-dev'
+gvc = "apalis-dev"
 print()
 print(f"Workload in my control plane GVC {gvc}:")
-for workload in (workloads:=client.workloads.list(gvc)):
+for workload in (workloads := client.workloads.list(gvc)):
     print(workload)
 
 
@@ -43,8 +37,8 @@ gvc = "apalis-dev"
 
 tmp = client.workloads.get(
     cpln.config.WorkloadConfig(
-        gvc='apalis-dev',
-        workload_id='broker-dashboard-api',
+        gvc="apalis-dev",
+        workload_id="broker-dashboard-api",
         location=location,
     )
 )
@@ -64,7 +58,9 @@ while True:
         print(f"Workload (workloads{[workload_name]}) is up and running!")
         break
     else:
-        print(f"Workload (workloads{[workload_name]}) is down ({response['message']}, {response['exit_code']}). Retrying...")
+        print(
+            f"Workload (workloads{[workload_name]}) is down ({response['message']}, {response['exit_code']}). Retrying..."
+        )
         time.sleep(1)
         continue
 

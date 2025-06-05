@@ -2,9 +2,8 @@ class GVCApiMixin:
     """
     A mixin class that provides GVC (Global Virtual Cluster) related API methods.
     """
-    def get_gvc(self,
-        name: str = None
-    ):
+
+    def get_gvc(self, name: str = None):
         """
         Retrieves GVC information from the Control Plane API.
 
@@ -18,15 +17,12 @@ class GVCApiMixin:
         Raises:
             APIError: If the request fails
         """
-        endpoint = 'gvc'
+        endpoint = "gvc"
         if name:
-            endpoint += f'/{name}'
+            endpoint += f"/{name}"
         return self._get(endpoint)
 
-    def create_gvc(self,
-        name: str,
-        description: str = None
-    ):
+    def create_gvc(self, name: str, description: str = None):
         """
         Creates a new GVC in the Control Plane.
 
@@ -37,11 +33,11 @@ class GVCApiMixin:
         Raises:
             ValueError: Currently not implemented
         """
-        raise ValueError('Not implemented! The payload to do this is annoyingly long, so somebody else do it.')
+        raise ValueError(
+            "Not implemented! The payload to do this is annoyingly long, so somebody else do it."
+        )
 
-    def delete_gvc(self,
-        name: str
-    ):
+    def delete_gvc(self, name: str):
         """
         Deletes a GVC from the Control Plane.
 
@@ -54,4 +50,4 @@ class GVCApiMixin:
         Raises:
             APIError: If the request fails
         """
-        return self._delete(f'gvc/{name}')
+        return self._delete(f"gvc/{name}")

@@ -1,10 +1,7 @@
-from typing import Dict, Optional, Any
+from typing import Optional
+
 from .api import APIClient
-from .models import (
-    GVCCollection,
-    ImageCollection,
-    WorkloadCollection
-)
+from .models import GVCCollection, ImageCollection, WorkloadCollection
 from .utils import kwargs_from_env
 
 
@@ -24,11 +21,12 @@ class CPLNClient:
         token (str): Authorization token for accessing the use of the API.
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         base_url: Optional[str] = None,
         org: Optional[str] = None,
         token: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize a CPLNClient.
@@ -42,11 +40,11 @@ class CPLNClient:
         # Create a config dict with all the args
         config_args = {}
         if base_url is not None:
-            config_args['base_url'] = base_url
+            config_args["base_url"] = base_url
         if org is not None:
-            config_args['org'] = org
+            config_args["org"] = org
         if token is not None:
-            config_args['token'] = token
+            config_args["token"] = token
 
         # Add any other kwargs
         config_args.update(kwargs)

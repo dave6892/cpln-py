@@ -1,22 +1,24 @@
-import pytest
 import os
-from unittest.mock import Mock, patch, MagicMock
-import requests
+from unittest.mock import Mock
+
+import pytest
 from cpln.api.client import APIClient
-from cpln.api.config import APIConfig
-from cpln.errors import NotFound, APIError
+from cpln.errors import APIError, NotFound
+
 
 def test_api_client_initialization(mock_config):
     client = APIClient(config=mock_config)
     assert client.config == mock_config
-    assert client.config.base_url == os.getenv('CPLN_BASE_URL')
-    assert client.config.org == os.getenv('CPLN_ORG')
-    assert client.config.token == os.getenv('CPLN_TOKEN')
+    assert client.config.base_url == os.getenv("CPLN_BASE_URL")
+    assert client.config.org == os.getenv("CPLN_ORG")
+    assert client.config.token == os.getenv("CPLN_TOKEN")
+
 
 def test_api_client_headers(mock_config):
     client = APIClient(config=mock_config)
     headers = client._headers
     assert headers == {"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+
 
 def test_api_client_get_gvc(mock_api_client):
     # Mock response is already set up in the fixture
@@ -29,8 +31,7 @@ def test_api_client_get_gvc(mock_api_client):
     # Verify the get method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc"
     mock_api_client._mock_get.assert_called_once_with(
-        expected_url,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        expected_url, headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
     )
 
     # Verify the result
@@ -49,8 +50,7 @@ def test_api_client_get_gvc_not_found(mock_api_client):
     # Verify the get method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc"
     mock_api_client._mock_get.assert_called_once_with(
-        expected_url,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        expected_url, headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
     )
 
 
@@ -66,9 +66,9 @@ def test_api_client_get_gvc_error(mock_api_client):
     # Verify the get method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc"
     mock_api_client._mock_get.assert_called_once_with(
-        expected_url,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        expected_url, headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
     )
+
 
 def test_api_client_get_image(mock_api_client):
     # Set up the mock response
@@ -81,16 +81,18 @@ def test_api_client_get_image(mock_api_client):
     # Verify the get method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/image"
     mock_api_client._mock_get.assert_called_once_with(
-        expected_url,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        expected_url, headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
     )
 
     # Verify the result
     assert result == {"data": "test"}
 
+
 def test_api_client_delete_gvc(mock_api_client):
     # Set up the mock response for successful delete
-    mock_api_client._mock_delete_response.status_code = 204  # Success status code for DELETE
+    mock_api_client._mock_delete_response.status_code = (
+        204  # Success status code for DELETE
+    )
 
     # Call the API method
     result = mock_api_client.delete_gvc("test-gvc")
@@ -98,8 +100,7 @@ def test_api_client_delete_gvc(mock_api_client):
     # Verify the delete method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc/test-gvc"
     mock_api_client._mock_delete.assert_called_once_with(
-        expected_url,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        expected_url, headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
     )
 
     # Verify the result
@@ -118,9 +119,9 @@ def test_api_client_delete_gvc_not_found(mock_api_client):
     # Verify the delete method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc/nonexistent-gvc"
     mock_api_client._mock_delete.assert_called_once_with(
-        expected_url,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        expected_url, headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
     )
+
 
 def test_api_client_patch_workload(mock_api_client):
     # Set up the mock response for successful patch
@@ -135,17 +136,14 @@ def test_api_client_patch_workload(mock_api_client):
     mock_config.workload_id = "test-workload"
 
     # Call the API method
-    result = mock_api_client.patch_workload(
-        config=mock_config,
-        data=test_data
-    )
+    result = mock_api_client.patch_workload(config=mock_config, data=test_data)
 
     # Verify the patch method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc/test-gvc/workload/test-workload"
     mock_api_client._mock_patch.assert_called_once_with(
         expected_url,
         json=test_data,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"},
     )
 
     # Verify the result
@@ -167,23 +165,22 @@ def test_api_client_patch_workload_error(mock_api_client):
 
     # Test that APIError exception is raised
     with pytest.raises(APIError):
-        mock_api_client.patch_workload(
-            config=mock_config,
-            data=test_data
-        )
+        mock_api_client.patch_workload(config=mock_config, data=test_data)
 
     # Verify the patch method was called with the correct arguments
     expected_url = f"{os.getenv('CPLN_BASE_URL', 'https://api.cpln.io')}/org/{os.getenv('CPLN_ORG', 'ledgestone')}/gvc/test-gvc/workload/test-workload"
     mock_api_client._mock_patch.assert_called_once_with(
         expected_url,
         json=test_data,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"},
     )
 
 
 def test_api_client_post(mock_api_client):
     # Set up the mock response for successful post
-    mock_api_client._mock_post_response.status_code = 201  # Success status code for POST
+    mock_api_client._mock_post_response.status_code = (
+        201  # Success status code for POST
+    )
 
     # Test data
     test_data = {"name": "test-resource"}
@@ -196,7 +193,7 @@ def test_api_client_post(mock_api_client):
     mock_api_client._mock_post.assert_called_once_with(
         expected_url,
         json=test_data,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"},
     )
 
     # Verify the result
@@ -208,7 +205,9 @@ def test_api_client_post_error(mock_api_client):
     mock_api_client._mock_post_response.status_code = 422
     mock_api_client._mock_post_response.text = "Unprocessable Entity"
     # Provide a json method that will be called in error handling
-    mock_api_client._mock_post_response.json.return_value = {"error": "Validation failed"}
+    mock_api_client._mock_post_response.json.return_value = {
+        "error": "Validation failed"
+    }
 
     # Test data
     test_data = {"invalid": "data"}
@@ -222,5 +221,5 @@ def test_api_client_post_error(mock_api_client):
     mock_api_client._mock_post.assert_called_once_with(
         expected_url,
         json=test_data,
-        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"}
+        headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"},
     )

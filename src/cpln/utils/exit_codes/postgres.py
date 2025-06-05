@@ -1,9 +1,11 @@
 from enum import Enum
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 
 class PostgresExitCode(Enum):
     """Enumeration of PostgreSQL command exit codes and their meanings.
     This class handles exit codes for both pg_dump and pg_restore commands."""
+
     SUCCESS = 0
     GENERAL_ERROR = 1
     INVALID_ARGUMENTS = 2
@@ -25,11 +27,11 @@ class PostgresExitCode(Enum):
             cls.SUCCESS.value: f"The {command} completed successfully.",
             cls.GENERAL_ERROR.value: f"An error occurred while executing {command}. This could be due to invalid command-line arguments, internal errors, or other issues.",
             cls.INVALID_ARGUMENTS.value: f"Invalid command-line arguments were provided to {command}.",
-            cls.CONNECTION_ERROR.value: f"Failed to connect to the database server. Check your connection parameters and ensure the server is running.",
+            cls.CONNECTION_ERROR.value: "Failed to connect to the database server. Check your connection parameters and ensure the server is running.",
             cls.PERMISSION_DENIED.value: f"Permission denied while accessing the database or {command} files.",
             cls.FILE_ERROR.value: f"Error accessing files for {command}. Check file permissions and available disk space.",
             cls.PROCESS_INTERRUPTED.value: f"The {command} process was interrupted by a signal (e.g., Ctrl+C).",
-            cls.UNKNOWN_ERROR.value: f"An unknown error occurred while executing {command}."
+            cls.UNKNOWN_ERROR.value: f"An unknown error occurred while executing {command}.",
         }
         return messages.get(code, f"Unknown {command} exit code: {code}")
 
@@ -48,6 +50,6 @@ class PostgresExitCode(Enum):
             cls.PERMISSION_DENIED.value: "Permission Denied",
             cls.FILE_ERROR.value: "File Error",
             cls.PROCESS_INTERRUPTED.value: "Process Interrupted",
-            cls.UNKNOWN_ERROR.value: "Unknown Error"
+            cls.UNKNOWN_ERROR.value: "Unknown Error",
         }
         return error_types.get(code)

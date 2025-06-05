@@ -1,13 +1,15 @@
-import unittest
-from unittest.mock import MagicMock, patch
 import json
-from typing import Dict, Any, Optional, Union, List, cast
-from cpln.utils.websocket import WebSocketAPI
+import unittest
+from typing import Dict, List
+from unittest.mock import MagicMock, patch
+
 from cpln.errors import (
     WebSocketConnectionError,
     WebSocketExitCodeError,
-    WebSocketOperationError
+    WebSocketOperationError,
 )
+from cpln.utils.websocket import WebSocketAPI
+
 
 class TestWebSocketAPI(unittest.TestCase):
     def setUp(self) -> None:
@@ -87,7 +89,7 @@ class TestWebSocketAPI(unittest.TestCase):
     #     self.assertEqual(result, request)
     #     mock_ws_instance.run_forever.assert_called_once()
 
-    @patch('websocket.WebSocketApp')
+    @patch("websocket.WebSocketApp")
     def test_exec_error(self, mock_ws_app: patch) -> None:
         """Test execution with error"""
         mock_ws_instance: MagicMock = MagicMock()
@@ -97,5 +99,6 @@ class TestWebSocketAPI(unittest.TestCase):
         with self.assertRaises(WebSocketConnectionError):
             self.ws_api.exec(command="test")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -1,3 +1,5 @@
-from .gvcs import GVCCollection, GVC
-from .images import ImageCollection, Image
-from .workloads import WorkloadCollection, Workload
+from .gvcs import GVCCollection
+from .images import ImageCollection
+from .workloads import WorkloadCollection
+
+__all__ = ["GVCCollection", "ImageCollection", "WorkloadCollection"]
