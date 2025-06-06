@@ -104,4 +104,5 @@ class Collection:
                 attrs=attrs, client=self.client, collection=self, state=state
             )
         else:
-            raise Exception(f"Can't create {self.model.__name__} from {attrs}")
+            model_name = self.model.__name__ if self.model else "Model"
+            raise ValueError(f"Can't create {model_name} from {attrs}")

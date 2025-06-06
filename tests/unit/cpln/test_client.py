@@ -1,18 +1,17 @@
-# import os
-# from typing import cast
-# from unittest.mock import patch
+import os
+from typing import cast
 
-# from cpln import CPLNClient
+from cpln import CPLNClient
 
 
-# def test_cpln_client_initialization(mock_cpln_client: CPLNClient) -> None:
-#     base_url = cast(str, os.getenv("CPLN_BASE_URL", "https://api.cpln.io"))
-#     org = cast(str, os.getenv("CPLN_ORG", "test-org"))
-#     token = cast(str, os.getenv("CPLN_TOKEN", "mock-token"))
+def test_cpln_client_initialization(mock_cpln_client: CPLNClient) -> None:
+    base_url = cast(str, os.getenv("CPLN_BASE_URL", "https://api.cpln.io"))
+    org = cast(str, os.getenv("CPLN_ORG", "test-org"))
+    token = cast(str, os.getenv("CPLN_TOKEN", "mock-token"))
 
-#     assert mock_cpln_client.api.config.base_url == base_url
-#     assert mock_cpln_client.api.config.org == org
-#     assert mock_cpln_client.api.config.token == token
+    assert mock_cpln_client.api.config.base_url == base_url
+    assert mock_cpln_client.api.config.org == org
+    assert mock_cpln_client.api.config.token == token
 
 
 # def test_cpln_client_from_env() -> None:
