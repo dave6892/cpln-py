@@ -82,7 +82,7 @@ def mock_api_client(
     # Create a patcher for the requests.Session constructor
     with patch("requests.Session", return_value=mock_session):
         # Create an instance of APIClient with the mock config
-        client: APIClient = APIClient(config=mock_config)
+        client: APIClient = APIClient.__new__(APIClient, **mock_config.asdict())
 
         # Make sure our session was properly set
         client.session = mock_session
