@@ -4,6 +4,7 @@ from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
 from ..utils import get_default_workload_template, load_template
 from .resource import Collection, Model
+from .workload_specs import WorkloadSpecState
 
 
 class Workload(Model):
@@ -25,6 +26,10 @@ class Workload(Model):
                 If the server returns an error.
         """
         return self.client.api.get_workload(self.config())
+
+    def get_spec_state(self) -> WorkloadSpecState:
+        self.get()
+        return WorkloadSpecState.parse_from_spec(self.spec)
 
     def delete(self) -> None:
         """
@@ -332,7 +337,7 @@ class WorkloadCollection(Collection):
             config (WorkloadConfig): The workload config.
 
         Returns:
-            (list): The workloads.
+            (dict): The workloads.
 
         Raises:
             ValueError: If neither gvc nor config is defined.
@@ -342,9 +347,9 @@ class WorkloadCollection(Collection):
 
         config = WorkloadConfig(gvc=gvc) if gvc else config
         resp = self.client.api.get_workload(config)["items"]
-        return {
-            workload["name"]: self.get(
+        return [
+            self.get(
                 config=WorkloadConfig(gvc=config.gvc, workload_id=workload["name"])
             )
             for workload in resp
-        }
+        ]
