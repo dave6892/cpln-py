@@ -1,7 +1,9 @@
 # Control Plane SDK for Python (cpln-py)
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![PyPI version](https://badge.fury.io/py/cpln-py.svg)](https://badge.fury.io/py/cpln-py)
+[![codecov](https://codecov.io/gh/dave6892/cpln-py/graph/badge.svg?token=WRK7S1Z16G)](https://codecov.io/gh/dave6892/cpln-py)
 
 A comprehensive Python library for interacting with the [Control Plane](https://controlplane.com) API. This SDK provides a Pythonic interface to manage GVCs (Global Virtual Clouds), workloads, images, and other Control Plane resources programmatically.
 
@@ -42,7 +44,7 @@ pdm run main.py
 
 ## Requirements
 
-- Python 3.9 or higher
+- Python 3.9+ (supports 3.9, 3.10, 3.11, 3.12, 3.13)
 - Control Plane account with API access
 - Service Account Key for authentication
 
@@ -269,7 +271,7 @@ pdm run pytest tests/unit/cpln/models/test_workloads.py
 
 ```bash
 # Format code
-pdm run black src/ tests/
+pdm run ruff format src/ tests/
 
 # Lint code
 pdm run flake8 src/ tests/
@@ -310,7 +312,7 @@ The SDK is organized into several key components:
 3. Make your changes
 4. Add tests for your changes
 5. Ensure all tests pass (`pdm run pytest`)
-6. Run code quality checks (`pdm run black .` and `pdm run ruff check .`)
+6. Run code quality checks (`pdm run ruff check .` and `pdm run ruff format .`)
 7. Commit your changes (`git commit -m 'Add amazing feature'`)
 8. Push to the branch (`git push origin feature/amazing-feature`)
 9. Open a Pull Request
@@ -330,6 +332,3 @@ For support and questions:
 ## Changelog
 
 See [CHANGELOG.md](docs/change-log.md) for version history and changes.
-
-# cpln-py
-A Python library for the Control Plane API
