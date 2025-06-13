@@ -99,7 +99,7 @@ class Workload(Model):
             print(response.status_code, response.text)
         else:
             print(response.status_code, response.json())
-            raise
+            raise RuntimeError(f"API call failed with status {response.status_code}")
 
     def suspend(self) -> None:
         self._change_suspend_state(state=True)
@@ -304,7 +304,7 @@ class WorkloadCollection(Collection):
             print(response.status_code, response.text)
         else:
             print(response.status_code, response.json())
-            raise
+            raise RuntimeError(f"API call failed with status {response.status_code}")
 
     def get(self, config: WorkloadConfig):
         """
@@ -337,7 +337,7 @@ class WorkloadCollection(Collection):
             config (WorkloadConfig): The workload config.
 
         Returns:
-            (dict): The workloads.
+            (list): The workloads.
 
         Raises:
             ValueError: If neither gvc nor config is defined.
