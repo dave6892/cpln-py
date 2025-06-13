@@ -62,6 +62,61 @@ class TestModel(unittest.TestCase):
         self.model.reload()
         self.assertEqual(self.model.attrs, new_attrs)
 
+    def test_attribute_access(self):
+        """Test attribute access through __getattr__"""
+        # Test accessing existing attribute
+        self.assertEqual(self.model.name, "Test Model")
+
+        # Test accessing non-existent attribute
+        with self.assertRaises(AttributeError) as context:
+            _ = self.model.non_existent
+        self.assertEqual(
+            str(context.exception), "'Model' has no attribute 'non_existent'"
+        )
+
+    def test_attribute_setting(self):
+        """Test attribute setting through __setattr__"""
+        # Test setting new attribute
+        self.model.new_attr = "new value"
+        self.assertEqual(self.model.attrs["new_attr"], "new value")
+
+        # Test updating existing attribute
+        self.model.name = "Updated Name"
+        self.assertEqual(self.model.attrs["name"], "Updated Name")
+
+        # Test setting protected attribute (should still work as it's not in protected_attrs)
+        self.model.id = "new-id"
+        self.assertEqual(self.model.attrs["id"], "new-id")
+
+    def test_attribute_deletion(self):
+        """Test attribute deletion through __delattr__"""
+        # Test deleting existing attribute
+        del self.model.name
+        self.assertNotIn("name", self.model.attrs)
+
+        # Test deleting non-existent attribute
+        with self.assertRaises(AttributeError) as context:
+            del self.model.non_existent
+        self.assertEqual(
+            str(context.exception), "'Model' has no attribute 'non_existent'"
+        )
+
+    def test_protected_attributes(self):
+        """Test protected attributes behavior"""
+        # Test that protected attributes can be set
+        self.model.attrs = {"new": "value"}
+        self.assertEqual(self.model.attrs, {"new": "value"})
+
+        # Test that protected attributes can be accessed
+        self.assertEqual(self.model.attrs, {"new": "value"})
+
+        # Test that protected attributes cannot be deleted
+        with self.assertRaises(AttributeError) as context:
+            del self.model.attrs
+        self.assertEqual(
+            str(context.exception), "Cannot delete protected attribute 'attrs'"
+        )
+
 
 class TestCollection(unittest.TestCase):
     def setUp(self):

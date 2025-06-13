@@ -33,6 +33,70 @@ class Model:
     def __hash__(self):
         return hash(f"{self.__class__.__name__}:{self.id}")
 
+    def __getattr__(self, name):
+        """
+        Allow attribute-style access to the attrs dictionary.
+
+        Args:
+            name: The name of the attribute to get
+
+        Returns:
+            The value of the attribute from attrs
+
+        Raises:
+            AttributeError: If the attribute doesn't exist in attrs
+        """
+        try:
+            return self.attrs[name]
+        except KeyError:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' has no attribute '{name}'"
+            ) from None
+
+    def __setattr__(self, name, value):
+        """
+        Handle attribute assignment, storing values in attrs if they're not
+        special attributes.
+
+        Args:
+            name: The name of the attribute to set
+            value: The value to set the attribute to
+        """
+        # List of attributes that should be set directly on the instance
+        direct_attrs = {"client", "collection", "state", "attrs"}
+
+        if name in direct_attrs:
+            super().__setattr__(name, value)
+        else:
+            # If attrs hasn't been initialized yet, initialize it
+            if not hasattr(self, "attrs"):
+                self.attrs = {}
+            self.attrs[name] = value
+
+    def __delattr__(self, name):
+        """
+        Handle attribute deletion, removing values from attrs if they're not
+        special attributes.
+
+        Args:
+            name: The name of the attribute to delete
+
+        Raises:
+            AttributeError: If trying to delete a special attribute
+        """
+        # List of attributes that should not be deleted
+        protected_attrs = {"client", "collection", "state", "attrs"}
+
+        if name in protected_attrs:
+            raise AttributeError(f"Cannot delete protected attribute '{name}'")
+
+        if name in self.attrs:
+            del self.attrs[name]
+        else:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' has no attribute '{name}'"
+            )
+
     @property
     def id(self):
         """
