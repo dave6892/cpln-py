@@ -63,16 +63,6 @@ class ImageCollection(Collection):
         """
         List images on the registry.
 
-        Args:
-            name (str): Only show images belonging to the repository ``name``
-            all (bool): Show intermediate image layers. By default, these are
-                filtered out.
-            filters (dict): Filters to be processed on the image list.
-                Available filters:
-                - ``dangling`` (bool)
-                - `label` (str|list): format either ``"key"``, ``"key=value"``
-                    or a list of such.
-
         Returns:
             (list of :py:class:`Image`): The images.
 

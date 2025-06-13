@@ -41,8 +41,8 @@ class Workload(Model):
     def clone(
         self,
         name: str,
-        gvc: str | None = None,
-        workload_type: str | None = None,
+        gvc: Optional[str] = None,
+        workload_type: Optional[str] = None,
     ) -> None:
         """
         Clone the workload.
@@ -254,14 +254,14 @@ class WorkloadCollection(Collection):
     def create(
         self,
         name: str,
-        gvc: str | None = None,
-        config: WorkloadConfig | None = None,
-        description: str | None = None,
-        image: str | None = None,
-        container_name: str | None = None,
-        workload_type: str | None = None,
-        metadata_file_path: str | None = None,
-        metadata: dict | None = None,
+        gvc: Optional[str] = None,
+        config: Optional[WorkloadConfig] = None,
+        description: Optional[str] = None,
+        image: Optional[str] = None,
+        container_name: Optional[str] = None,
+        workload_type: Optional[str] = None,
+        metadata_file_path: Optional[str] = None,
+        metadata: Optional[dict] = None,
     ) -> None:
         """
         Create the workload.
