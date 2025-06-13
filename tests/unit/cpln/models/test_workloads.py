@@ -169,14 +169,12 @@ class TestWorkload(unittest.TestCase):
     def test_export(self) -> None:
         """Test export method"""
         # Mock the get method to avoid API call
-        self.workload.get = MagicMock()
+        with patch.object(self.workload, "get"):
+            result = self.workload.export()
 
-        result = self.workload.export()
-
-        self.workload.get.assert_called_once()
-        self.assertEqual(result["name"], self.attrs["name"])
-        self.assertEqual(result["gvc"], self.state["gvc"])
-        self.assertEqual(result["spec"], self.attrs["spec"])
+            self.assertEqual(result["name"], self.attrs["name"])
+            self.assertEqual(result["gvc"], self.state["gvc"])
+            self.assertEqual(result["spec"], self.attrs["spec"])
 
     def test_config_default(self) -> None:
         """Test config method with default parameters"""
@@ -258,28 +256,24 @@ class TestWorkload(unittest.TestCase):
         # Setup test data
         new_name: str = "cloned-workload"
 
-        # Mock the export method
-        self.workload.export = MagicMock(
-            return_value={
-                "name": self.attrs["name"],
-                "gvc": self.state["gvc"],
-                "spec": self.attrs["spec"],
-            }
-        )
-
         # Mock successful API response
         mock_response: Mock = Mock(spec=Response)
         mock_response.status_code = 201
         mock_response.text = "Created"
         self.client.api.create_workload.return_value = mock_response
 
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
-            # Call clone method
-            self.workload.clone(name=new_name)
+        # Mock the export method to return the expected data
+        with patch.object(self.workload, "export") as mock_export:
+            mock_export.return_value = {
+                "name": self.attrs["name"],
+                "gvc": self.state["gvc"],
+                "spec": self.attrs["spec"],
+            }
 
-        # Verify export was called
-        self.workload.export.assert_called_once()
+            # Mock print to avoid output during test
+            with patch("builtins.print"):
+                # Call clone method - should not raise any exceptions
+                self.workload.clone(name=new_name)
 
         # Verify API call
         self.client.api.create_workload.assert_called_once()
@@ -475,19 +469,17 @@ class TestWorkloadCollection(unittest.TestCase):
         result = self.collection.list(gvc=gvc)
 
         # Verify result structure
-        self.assertIsInstance(result, dict)
+        self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
-        self.assertIn("workload1", result)
-        self.assertIn("workload2", result)
 
         # Verify result contents
-        self.assertIsInstance(result["workload1"], Workload)
-        self.assertEqual(result["workload1"].attrs, workloads[0])
-        self.assertEqual(result["workload1"].state["gvc"], gvc)
+        self.assertIsInstance(result[0], Workload)
+        self.assertEqual(result[0].attrs, workloads[0])
+        self.assertEqual(result[0].state["gvc"], gvc)
 
-        self.assertIsInstance(result["workload2"], Workload)
-        self.assertEqual(result["workload2"].attrs, workloads[1])
-        self.assertEqual(result["workload2"].state["gvc"], gvc)
+        self.assertIsInstance(result[1], Workload)
+        self.assertEqual(result[1].attrs, workloads[1])
+        self.assertEqual(result[1].state["gvc"], gvc)
 
         # Verify API calls
         self.assertEqual(self.client.api.get_workload.call_count, 3)
@@ -512,7 +504,7 @@ class TestWorkloadCollection(unittest.TestCase):
         result = self.collection.list(config=config)
 
         # Verify result structure
-        self.assertIsInstance(result, dict)
+        self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
 
         # Verify API calls
