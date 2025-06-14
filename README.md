@@ -36,10 +36,12 @@ git clone https://github.com/dave6892/cpln-py.git
 cd cpln-py
 
 # Install dependencies
-pdm install
+make install
 
-# Run example to verify installation
-pdm run main.py
+# Run examples to verify installation
+pdm run python examples/example_cpln_gvc.py
+pdm run python examples/example_cpln_images.py
+pdm run python examples/example_cpln_workload.py
 ```
 
 ## Requirements
@@ -258,7 +260,7 @@ client = cpln.CPLNClient(
 
 ```bash
 # Run all tests
-pdm run pytest
+make test
 
 # Run with coverage
 pdm run pytest --cov=src/cpln
@@ -284,8 +286,8 @@ pdm run mypy src/
 ### Documentation
 
 ```bash
-# Build documentation
-pdm run mkdocs serve
+# Build and serve documentation
+make docs
 ```
 
 ## API Reference
@@ -311,8 +313,8 @@ The SDK is organized into several key components:
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Add tests for your changes
-5. Ensure all tests pass (`pdm run pytest`)
-6. Run code quality checks (`pdm run ruff check .` and `pdm run ruff format .`)
+5. Ensure all tests pass (`make test`)
+6. Run code quality checks (`make lint` and `make format`)
 7. Commit your changes (`git commit -m 'Add amazing feature'`)
 8. Push to the branch (`git push origin feature/amazing-feature`)
 9. Open a Pull Request

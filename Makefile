@@ -27,11 +27,11 @@ clean:
 	find . -name ".mypy_cache" -type d -prune -exec rm -rf {} +
 
 lint:
-	ruff check .
-	mypy src/cpln
+	pdm run ruff check .
+	pdm run mypy src/cpln
 
 format:
-	ruff format .
+	pdm run ruff format .
 
 test:
 	pdm run pytest
