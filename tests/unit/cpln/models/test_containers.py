@@ -492,9 +492,10 @@ class TestContainerCollection(unittest.TestCase):
             gvc=self.gvc_name, workload_id=self.workload_name
         )
 
-        # Should return empty list on API error
-        containers = self.collection._get_workload_containers(workload_config)
-        self.assertEqual(containers, [])
+        # Should re-raise APIError so it can be handled by retry logic
+        with self.assertRaises(APIError) as cm:
+            self.collection._get_workload_containers(workload_config)
+        self.assertEqual(str(cm.exception), "API Error")
 
     def test_get_workload_containers_deployment_error(self) -> None:
         """Test handling of deployment errors when getting workload containers"""
@@ -510,11 +511,12 @@ class TestContainerCollection(unittest.TestCase):
             gvc=self.gvc_name, workload_id=self.workload_name
         )
 
-        # Should return empty list on deployment error
-        containers = self.collection._get_workload_containers(
-            workload_config, location_filter=self.location
-        )
-        self.assertEqual(containers, [])
+        # Should re-raise APIError so it can be handled by retry logic
+        with self.assertRaises(APIError) as cm:
+            self.collection._get_workload_containers(
+                workload_config, location_filter=self.location
+            )
+        self.assertEqual(str(cm.exception), "Deployment Error")
 
 
 class TestAdvancedListingOptions(unittest.TestCase):
@@ -984,15 +986,22 @@ class TestAdvancedContainerListing(unittest.TestCase):
 
         workload_config = WorkloadConfig(gvc=self.gvc_name, workload_id="test-workload")
 
-        # Mock API to fail with rate limiting error first time, then succeed
-        self.client.api.get_workload.side_effect = [
-            APIError("Rate limit exceeded"),  # First call fails
-            {"name": "test-workload"},  # Second call succeeds
-        ]
-        self.client.api.get_workload_deployment.return_value = {
-            "metadata": {"name": "test-deployment"},
-            "status": {"versions": []},
+        # Mock get_workload to return workload data (this is called first to get workload details)
+        self.client.api.get_workload.return_value = {
+            "name": "test-workload",
+            "spec": {"defaultOptions": {"locations": [self.location]}},
         }
+
+        # Mock API to fail with rate limiting error first time, then succeed
+        # This is the actual call that gets retried in _get_workload_containers
+        rate_limit_error = APIError("Rate limit exceeded")
+        self.client.api.get_workload_deployment.side_effect = [
+            rate_limit_error,  # First call fails
+            {
+                "metadata": {"name": "test-deployment"},
+                "status": {"versions": []},
+            },  # Second call succeeds
+        ]
 
         # Should succeed after retry
         containers = self.collection._get_workload_containers_with_retry(

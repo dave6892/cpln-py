@@ -697,13 +697,16 @@ class ContainerCollection(Collection):
 
                     containers.extend(deployment_containers)
 
-                except (APIError, Exception):
-                    # Skip locations where deployment data is not available
+                except APIError:
+                    # Re-raise APIError so it can be handled by retry logic
+                    raise
+                except Exception:
+                    # Skip locations where deployment data is not available for other errors
                     continue
 
         except APIError:
-            # Skip workloads that can't be accessed
-            pass
+            # Re-raise APIError so it can be handled by retry logic
+            raise
 
         return containers
 
