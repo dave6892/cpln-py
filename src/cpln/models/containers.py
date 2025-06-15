@@ -518,7 +518,8 @@ class ContainerCollection(Collection):
 
         Args:
             workload_config: Workload configuration
-            location_filter: Optional location filter
+            location_filter: Optional location filter to only get containers
+                          from a specific deployment location (e.g., 'aws-us-east-1')
 
         Returns:
             List of Container instances
@@ -527,7 +528,7 @@ class ContainerCollection(Collection):
 
         try:
             # Get workload details to find available locations
-            workload_data = self.client.api.get_workload(workload_config)
+            workload_data = self._get_workload_data(workload_config)
 
             # If no location filter, try to get deployments from workload spec
             if location_filter:
@@ -538,25 +539,9 @@ class ContainerCollection(Collection):
 
             for location in locations:
                 try:
-                    # Get deployment data for this location
-                    deployment_config = WorkloadConfig(
-                        gvc=workload_config.gvc,
-                        workload_id=workload_config.workload_id,
-                        location=location,
+                    deployment_containers = self._get_deployment_containers(
+                        workload_config, location
                     )
-
-                    deployment_data = self.client.api.get_workload_deployment(
-                        deployment_config
-                    )
-
-                    # Parse containers from deployment data
-                    deployment_containers = ContainerParser.parse_deployment_containers(
-                        deployment_data=deployment_data,
-                        workload_name=workload_config.workload_id,
-                        gvc_name=workload_config.gvc,
-                        location=location,
-                    )
-
                     containers.extend(deployment_containers)
 
                 except (APIError, Exception):
@@ -568,6 +553,48 @@ class ContainerCollection(Collection):
             pass
 
         return containers
+
+    def _get_workload_data(self, workload_config: WorkloadConfig) -> Dict[str, Any]:
+        """
+        Get workload data from the API.
+
+        Args:
+            workload_config: Workload configuration
+
+        Returns:
+            Workload data dictionary
+        """
+        return self.client.api.get_workload(workload_config)
+
+    def _get_deployment_containers(
+        self, workload_config: WorkloadConfig, location: str
+    ) -> List[Container]:
+        """
+        Get containers for a specific workload deployment.
+
+        Args:
+            workload_config: Workload configuration
+            location: Deployment location
+
+        Returns:
+            List of Container instances
+        """
+        # Get deployment data for this location
+        deployment_config = WorkloadConfig(
+            gvc=workload_config.gvc,
+            workload_id=workload_config.workload_id,
+            location=location,
+        )
+
+        deployment_data = self.client.api.get_workload_deployment(deployment_config)
+
+        # Parse containers from deployment data
+        return ContainerParser.parse_deployment_containers(
+            deployment_data=deployment_data,
+            workload_name=workload_config.workload_id,
+            gvc_name=workload_config.gvc,
+            location=location,
+        )
 
     def _infer_workload_locations(self, workload_data: Dict[str, Any]) -> List[str]:
         """
@@ -603,17 +630,55 @@ class ContainerCollection(Collection):
 
         return locations
 
-    def get(self, **kwargs) -> Container:
+    def get(self, **kwargs) -> Optional[Container]:
         """
-        Get a specific container (not implemented for read-only model).
+        Get a specific container by name within a workload.
+
+        For containers, you must provide:
+        - gvc: Name of the GVC
+        - workload_name: Name of the workload
+        - container_name: Name of the container to find
+        - location: Optional location filter to search in specific deployment
+
+        Args:
+            **kwargs: Container search parameters
+
+        Returns:
+            Container instance if found, None otherwise
 
         Raises:
-            NotImplementedError: Containers are read-only in this implementation
+            ValueError: If required parameters are missing
+            APIError: If the API request fails
+            NotImplementedError: If called with unsupported parameters (like 'id')
         """
-        raise NotImplementedError(
-            "Container retrieval by ID is not supported. "
-            "Use list() method with filters instead."
-        )
+        # Check for the old-style 'id' parameter that tests might use
+        if "id" in kwargs:
+            raise NotImplementedError(
+                "Container retrieval by ID is not supported. "
+                "Use get(gvc='name', workload_name='name', container_name='name') instead."
+            )
+
+        # Extract required parameters
+        gvc = kwargs.get("gvc")
+        workload_name = kwargs.get("workload_name")
+        container_name = kwargs.get("container_name")
+        location = kwargs.get("location")
+
+        # Validate required parameters
+        if not all([gvc, workload_name, container_name]):
+            raise ValueError(
+                "get() requires 'gvc', 'workload_name', and 'container_name' parameters"
+            )
+
+        # List all containers for the workload
+        containers = self.list(gvc=gvc, workload_name=workload_name, location=location)
+
+        # Find the specific container by name
+        for container in containers:
+            if container.name == container_name:
+                return container
+
+        return None
 
     def create(self, **kwargs) -> Container:
         """
