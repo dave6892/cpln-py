@@ -413,7 +413,9 @@ class TestContainerCollection(unittest.TestCase):
         """Test that list method requires workload_name (workload-centric)"""
         # Call list method without workload_name should raise ValueError
         with self.assertRaises(ValueError) as cm:
-            self.collection.list(gvc=self.gvc_name, location=self.location)
+            self.collection.list(
+                gvc=self.gvc_name, workload_name=None, location=self.location
+            )
 
         self.assertIn("workload_name is required", str(cm.exception))
         self.assertIn("workload-centric", str(cm.exception))
@@ -1001,12 +1003,8 @@ class TestAdvancedContainerListing(unittest.TestCase):
             enable_cache=False,
         )
 
-        # Mock API responses
-        self.client.api.get_workload.side_effect = [
-            {"items": [{"name": "wl1"}, {"name": "wl2"}]},
-            {"name": "wl1"},
-            {"name": "wl2"},
-        ]
+        # Mock API responses for a single workload (workload-centric)
+        self.client.api.get_workload.return_value = {"name": "wl1"}
         self.client.api.get_workload_deployment.return_value = {
             "metadata": {"name": "test-deployment"},
             "status": {"versions": []},
@@ -1016,14 +1014,207 @@ class TestAdvancedContainerListing(unittest.TestCase):
             gvc=self.gvc_name, workload_name="wl1", options=options
         )
 
-        # Verify callback was called
+        # Verify callback was called (single workload should call once with 1/1)
         self.assertGreater(len(callback_calls), 0)
 
-        # Check that all calls were for "Processing workloads"
-        for stage, current, total in callback_calls:
-            self.assertEqual(stage, "Processing workloads")
-            self.assertGreaterEqual(current, 1)
-            self.assertEqual(total, 2)
+        # Check that callback was called for "Processing workloads"
+        stage, current, total = callback_calls[0]
+        self.assertEqual(stage, "Processing workloads")
+        self.assertEqual(current, 1)
+        self.assertEqual(total, 1)
+
+
+class TestMissingContainerCoverage(unittest.TestCase):
+    """Tests for missing coverage areas in containers.py"""
+
+    def setUp(self) -> None:
+        """Set up test data"""
+        self.client = MagicMock()
+        self.collection = ContainerCollection(client=self.client)
+        self.gvc_name = "test-gvc"
+        self.location = "aws-us-west-2"
+        self.workload_name = "test-workload"
+
+    def test_list_requires_workload_name_validation(self) -> None:
+        """Test that list method validates workload_name properly"""
+        # Test with empty string
+        with self.assertRaises(ValueError) as cm:
+            self.collection.list(
+                gvc=self.gvc_name, workload_name="", location=self.location
+            )
+
+        self.assertIn("workload_name is required", str(cm.exception))
+        self.assertIn("workload-centric", str(cm.exception))
+
+    def test_list_advanced_no_workload_name_error(self) -> None:
+        """Test list_advanced with missing workload_name"""
+        with self.assertRaises(ValueError) as cm:
+            self.collection.list_advanced(gvc=self.gvc_name, workload_name="")
+
+        self.assertIn("workload_name is required", str(cm.exception))
+
+    def test_container_parser_invalid_version_exception_handling(self) -> None:
+        """Test ContainerParser handling of invalid version data in deployment"""
+        # Test data with invalid version structure
+        deployment_data = {
+            "metadata": {"name": "test-deployment"},
+            "status": {
+                "versions": [
+                    "invalid-version-data",  # Not a dict
+                    {
+                        "version": "v1",
+                        # Missing containers key
+                    },
+                ]
+            },
+        }
+
+        containers = ContainerParser.parse_deployment_containers(
+            deployment_data=deployment_data,
+            workload_name=self.workload_name,
+            gvc_name=self.gvc_name,
+            location=self.location,
+        )
+
+        # Should return empty list since no valid containers found
+        self.assertEqual(containers, [])
+
+    def test_container_parser_api_error_exception_handling(self) -> None:
+        """Test ContainerParser exception handling for other errors"""
+        # Test with completely malformed data that causes TypeError
+        deployment_data = {
+            "status": {
+                "versions": [
+                    {
+                        "containers": "invalid-containers-string",  # Should be dict, not string
+                    }
+                ]
+            }
+        }
+
+        with self.assertRaises(APIError) as cm:
+            ContainerParser.parse_deployment_containers(
+                deployment_data=deployment_data,
+                workload_name=self.workload_name,
+                gvc_name=self.gvc_name,
+                location=self.location,
+            )
+
+        self.assertIn("Failed to parse deployment containers", str(cm.exception))
+
+    def test_sequential_processing_all_workloads(self) -> None:
+        """Test sequential processing with all workloads (not single)"""
+        from cpln.models.containers import AdvancedListingOptions
+
+        options = AdvancedListingOptions(
+            enable_parallel=False,
+            enable_cache=False,
+        )
+
+        # Mock API responses for multiple workloads
+        self.client.api.get_workload.side_effect = [
+            {
+                "items": [{"name": "wl1"}, {"name": "wl2"}]
+            },  # First call gets workload list
+            {"name": "wl1"},  # Get details for wl1
+            {"name": "wl2"},  # Get details for wl2
+        ]
+        self.client.api.get_workload_deployment.return_value = {
+            "metadata": {"name": "test-deployment"},
+            "status": {"versions": []},
+        }
+
+        # Test list_advanced without specifying workload_name (should process all)
+        containers = self.collection._list_containers_sequential(
+            gvc=self.gvc_name,
+            location=self.location,
+            workload_name=None,  # This triggers all workloads processing
+            options=options,
+            stats=None,
+        )
+
+        self.assertIsInstance(containers, list)
+        # Should have called get_workload to get the list
+        self.assertTrue(self.client.api.get_workload.called)
+
+    def test_get_workload_containers_exception_handling(self) -> None:
+        """Test _get_workload_containers exception re-raising"""
+        from cpln.config import WorkloadConfig
+        from cpln.errors import APIError
+
+        # Mock API to raise APIError
+        self.client.api.get_workload.side_effect = APIError("API Error")
+
+        workload_config = WorkloadConfig(
+            gvc=self.gvc_name, workload_id=self.workload_name
+        )
+
+        # Should re-raise APIError
+        with self.assertRaises(APIError):
+            self.collection._get_workload_containers(workload_config)
+
+    def test_retry_logic_non_retryable_error(self) -> None:
+        """Test retry logic with non-retryable error"""
+        from cpln.config import WorkloadConfig
+        from cpln.errors import APIError
+        from cpln.models.containers import AdvancedListingOptions
+
+        options = AdvancedListingOptions(
+            enable_retry=True,
+            max_retries=3,
+        )
+
+        workload_config = WorkloadConfig(
+            gvc=self.gvc_name, workload_id=self.workload_name
+        )
+
+        # Mock API to raise non-retryable error
+        self.client.api.get_workload.side_effect = APIError("Permission denied")
+
+        # Should raise the error immediately (not retry)
+        with self.assertRaises(APIError) as cm:
+            self.collection._get_workload_containers_with_retry(
+                workload_config, self.location, options
+            )
+
+        self.assertEqual(str(cm.exception), "Permission denied")
+
+    def test_parallel_processing_exception_handling(self) -> None:
+        """Test parallel processing with exception handling"""
+        from cpln.errors import APIError
+        from cpln.models.containers import (
+            AdvancedListingOptions,
+            ContainerListingStatistics,
+        )
+
+        options = AdvancedListingOptions(
+            enable_parallel=True,
+            max_workers=2,
+            enable_cache=False,
+        )
+        stats = ContainerListingStatistics()
+
+        # Mock API to return workloads list but fail on individual workload processing
+        self.client.api.get_workload.return_value = {
+            "items": [{"name": "wl1"}, {"name": "wl2"}]
+        }
+
+        # Mock deployment call to fail
+        self.client.api.get_workload_deployment.side_effect = APIError(
+            "Deployment error"
+        )
+
+        containers = self.collection._list_containers_parallel(
+            gvc=self.gvc_name,
+            location=self.location,
+            options=options,
+            stats=stats,
+        )
+
+        # Should handle exceptions and continue
+        self.assertIsInstance(containers, list)
+        self.assertEqual(stats.failed_workloads, 2)
+        self.assertEqual(len(stats.errors), 2)
 
 
 if __name__ == "__main__":

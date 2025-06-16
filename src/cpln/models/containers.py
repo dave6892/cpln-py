@@ -602,7 +602,7 @@ class ContainerCollection(Collection):
     def list(
         self,
         gvc: str,
-        workload_name: str,
+        workload_name: Optional[str] = None,
         location: Optional[str] = None,
     ) -> List[Container]:
         """
@@ -930,6 +930,11 @@ class ContainerCollection(Collection):
         if workload_name:
             # Process single workload
             workload_config.workload_id = workload_name
+
+            # Call progress callback if provided
+            if options.progress_callback:
+                options.progress_callback("Processing workloads", 1, 1)
+
             workload_containers = self._get_workload_containers_with_retry(
                 workload_config, location, options
             )
