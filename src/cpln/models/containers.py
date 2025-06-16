@@ -643,6 +643,10 @@ class StatusParser:
         }
 
         for version in versions:
+            # Skip non-dict versions to handle malformed data gracefully
+            if not isinstance(version, dict):
+                continue
+
             containers = version.get("containers", {})
             if container_name in containers:
                 container_info = containers[container_name]
