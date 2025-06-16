@@ -413,8 +413,14 @@ class StatusParser:
         # Parse version information
         versions = deployment_status.get("versions", [])
         if versions and isinstance(versions, list):
-            latest_version = versions[-1]  # Most recent version
-            if isinstance(latest_version, dict):
+            # Find the latest valid version (dict) from the end of the list
+            latest_version = None
+            for version in reversed(versions):
+                if isinstance(version, dict):
+                    latest_version = version
+                    break
+
+            if latest_version:
                 status_info.update(
                     {
                         "latest_version_name": latest_version.get("name"),
@@ -424,6 +430,19 @@ class StatusParser:
                         "latest_version_ready": latest_version.get("ready"),
                         "latest_version_message": latest_version.get("message"),
                         "latest_version_zone": latest_version.get("zone"),
+                    }
+                )
+            else:
+                # Set default None values when no valid version dict found
+                status_info.update(
+                    {
+                        "latest_version_name": None,
+                        "latest_version_created": None,
+                        "latest_version_workload": None,
+                        "latest_version_gvc": None,
+                        "latest_version_ready": None,
+                        "latest_version_message": None,
+                        "latest_version_zone": None,
                     }
                 )
         else:
