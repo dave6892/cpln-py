@@ -11,6 +11,47 @@ from .resource import Collection
 
 
 @dataclass
+class Status:
+    """
+    Represents deployment status information parsed from Control Plane deployment status payloads.
+    """
+
+    # Basic deployment status
+    endpoint: Optional[str] = None
+    remote: Optional[str] = None
+    last_processed_version: Optional[int] = None
+    expected_deployment_version: Optional[int] = None
+    ready: bool = False
+    deploying: bool = False
+    message: Optional[str] = None
+
+    # Latest version information
+    latest_version_name: Optional[str] = None
+    latest_version_created: Optional[str] = None
+    latest_version_workload: Optional[int] = None
+    latest_version_gvc: Optional[int] = None
+    latest_version_ready: Optional[bool] = None
+    latest_version_message: Optional[str] = None
+    latest_version_zone: Optional[str] = None
+
+    # Job execution information
+    latest_job_workload_version: Optional[int] = None
+    latest_job_status: Optional[str] = None
+    latest_job_start_time: Optional[str] = None
+    latest_job_completion_time: Optional[str] = None
+    latest_job_name: Optional[str] = None
+    latest_job_replica: Optional[str] = None
+
+    # Job condition information
+    latest_job_condition_status: Optional[str] = None
+    latest_job_condition_type: Optional[str] = None
+    latest_job_condition_message: Optional[str] = None
+    latest_job_condition_reason: Optional[str] = None
+    latest_job_condition_last_detection_time: Optional[str] = None
+    latest_job_condition_last_transition_time: Optional[str] = None
+
+
+@dataclass
 class Container:
     """
     Represents a container extracted from Control Plane deployment data.
@@ -51,6 +92,9 @@ class Container:
     deployment_name: Optional[str] = None
     version: Optional[str] = None
 
+    # Status dataclass object
+    status_obj: Optional[Status] = None
+
     def __post_init__(self):
         """Initialize default values after dataclass creation."""
         if self.environment_variables is None:
@@ -69,6 +113,7 @@ class Container:
         location: str,
         deployment_name: Optional[str] = None,
         version_data: Optional[Dict[str, Any]] = None,
+        deployment_status: Optional[Dict[str, Any]] = None,
     ) -> "Container":
         """
         Create a Container instance from deployment payload data.
@@ -80,9 +125,10 @@ class Container:
             location: Deployment location
             deployment_name: Name of the deployment
             version_data: Optional version metadata
+            deployment_status: Optional deployment status data for parsing container status
 
         Returns:
-            Container instance
+            Container instance with parsed status information
         """
         # Extract basic container info
         name = container_data.get("name", "")
@@ -109,7 +155,8 @@ class Container:
         if version_data:
             version = version_data.get("version")
 
-        return cls(
+        # Create the container instance
+        container = cls(
             name=name,
             image=image,
             workload_name=workload_name,
@@ -122,6 +169,16 @@ class Container:
             ports=ports,
         )
 
+        # Parse and assign status information if deployment_status is provided
+        if deployment_status:
+            status_obj = cls._parse_status_from_deployment(deployment_status, name)
+            container.status_obj = status_obj
+
+            # Update container status from parsed data
+            container.update_status_from_deployment(deployment_status)
+
+        return container
+
     @classmethod
     def from_job_payload(
         cls,
@@ -130,6 +187,7 @@ class Container:
         gvc_name: str,
         location: str,
         job_data: Optional[Dict[str, Any]] = None,
+        job_status: Optional[Dict[str, Any]] = None,
     ) -> "Container":
         """
         Create a Container instance from job execution payload data.
@@ -140,9 +198,10 @@ class Container:
             gvc_name: Name of the parent GVC
             location: Deployment location
             job_data: Optional job metadata
+            job_status: Optional job status data for parsing container status
 
         Returns:
-            Container instance
+            Container instance with parsed status information
         """
         # Job containers are similar to deployment containers
         # but may have different structure
@@ -153,7 +212,72 @@ class Container:
             location=location,
             deployment_name=job_data.get("name") if job_data else None,
             version_data=job_data,
+            deployment_status=job_status,
         )
+
+    @staticmethod
+    def _parse_status_from_deployment(
+        deployment_status: Dict[str, Any],
+        container_name: str,
+    ) -> Status:
+        """
+        Parse Status dataclass from deployment status data.
+
+        Args:
+            deployment_status: Deployment status data from the API
+            container_name: Name of the container to parse status for
+
+        Returns:
+            Status dataclass instance with parsed deployment status information
+        """
+        # Parse general deployment status
+        status_info = StatusParser.parse_deployment_status(deployment_status)
+
+        # Parse container-specific status from versions if available
+        versions = deployment_status.get("versions", [])
+        _ = StatusParser.parse_container_status_from_versions(versions, container_name)
+
+        # Create and populate Status dataclass
+        status = Status(
+            # Basic deployment status
+            endpoint=status_info.get("endpoint"),
+            remote=status_info.get("remote"),
+            last_processed_version=status_info.get("last_processed_version"),
+            expected_deployment_version=status_info.get("expected_deployment_version"),
+            ready=status_info.get("ready", False),
+            deploying=status_info.get("deploying", False),
+            message=status_info.get("message"),
+            # Latest version information
+            latest_version_name=status_info.get("latest_version_name"),
+            latest_version_created=status_info.get("latest_version_created"),
+            latest_version_workload=status_info.get("latest_version_workload"),
+            latest_version_gvc=status_info.get("latest_version_gvc"),
+            latest_version_ready=status_info.get("latest_version_ready"),
+            latest_version_message=status_info.get("latest_version_message"),
+            latest_version_zone=status_info.get("latest_version_zone"),
+            # Job execution information
+            latest_job_workload_version=status_info.get("latest_job_workload_version"),
+            latest_job_status=status_info.get("latest_job_status"),
+            latest_job_start_time=status_info.get("latest_job_start_time"),
+            latest_job_completion_time=status_info.get("latest_job_completion_time"),
+            latest_job_name=status_info.get("latest_job_name"),
+            latest_job_replica=status_info.get("latest_job_replica"),
+            # Job condition information
+            latest_job_condition_status=status_info.get("latest_job_condition_status"),
+            latest_job_condition_type=status_info.get("latest_job_condition_type"),
+            latest_job_condition_message=status_info.get(
+                "latest_job_condition_message"
+            ),
+            latest_job_condition_reason=status_info.get("latest_job_condition_reason"),
+            latest_job_condition_last_detection_time=status_info.get(
+                "latest_job_condition_last_detection_time"
+            ),
+            latest_job_condition_last_transition_time=status_info.get(
+                "latest_job_condition_last_transition_time"
+            ),
+        )
+
+        return status
 
     def update_status(
         self,
@@ -787,6 +911,7 @@ class ContainerParser:
                         location=location,
                         deployment_name=deployment_data.get("metadata", {}).get("name"),
                         version_data=version_data,
+                        deployment_status=deployment_data.get("status", {}),
                     )
 
                     containers.append(container)
