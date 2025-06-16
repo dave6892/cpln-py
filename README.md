@@ -5,20 +5,18 @@
 [![PyPI version](https://badge.fury.io/py/cpln-py.svg)](https://badge.fury.io/py/cpln-py)
 [![codecov](https://codecov.io/gh/dave6892/cpln-py/graph/badge.svg?token=WRK7S1Z16G)](https://codecov.io/gh/dave6892/cpln-py)
 
-A comprehensive Python library for interacting with the [Control Plane](https://controlplane.com) API. This SDK provides a Pythonic interface to manage GVCs (Global Virtual Clouds), workloads, containers, images, and other Control Plane resources programmatically.
+A comprehensive Python library for interacting with the [Control Plane](https://controlplane.com) API. This SDK provides a Pythonic interface to manage GVCs (Global Virtual Clouds), workloads, images, and other Control Plane resources programmatically.
 
 ## Features
 
 - **🚀 Easy-to-use client interface** - Simple Python client for Control Plane API
 - **🔧 Workload Management** - Create, deploy, manage, and execute commands in workloads
-- **📦 Container Operations** - Comprehensive container visibility and management with workload-centric architecture
 - **🖼️ Image Management** - Handle container images in Control Plane registry
 - **🌐 GVC Operations** - Manage Global Virtual Clouds and their configurations
 - **⚡ WebSocket Support** - Real-time command execution with proper error handling
 - **🔐 Authentication** - Secure API access with token-based authentication
 - **🧪 Well-tested** - Comprehensive test suite with high coverage
 - **📚 Type Hints** - Full type annotation support for better development experience
-- **🏗️ Clean Architecture** - Workload-centric design with clear separation of concerns
 
 ## Installation
 
@@ -41,10 +39,9 @@ cd cpln-py
 make install
 
 # Run examples to verify installation
-pdm run python examples/example_cpln_gvc.py <gvc-name>
-pdm run python examples/example_cpln_images.py <gvc-name>
-pdm run python examples/example_cpln_workload.py <gvc-name>
-pdm run python examples/example_cpln_containers.py <gvc-name>
+pdm run python examples/example_cpln_gvc.py
+pdm run python examples/example_cpln_images.py
+pdm run python examples/example_cpln_workload.py
 ```
 
 ## Requirements
@@ -180,6 +177,71 @@ else:
 # Export workload configuration
 config_data = workload.export()
 print(f"Workload config: {config_data}")
+```
+
+### Managing Containers (Workload-Centric)
+
+```python
+# List containers for a specific workload (workload-centric approach)
+containers = client.containers.list(gvc="my-gvc", workload_name="my-workload")
+for container in containers:
+    print(f"Container: {container.name} ({container.image})")
+    print(f"  Workload: {container.workload_name}")
+    print(f"  Location: {container.location}")
+    print(f"  Healthy: {container.is_healthy()}")
+
+# List containers for specific workload in specific location
+containers = client.containers.list(
+    gvc="my-gvc",
+    workload_name="my-workload",
+    location="aws-us-west-2"
+)
+
+# Access containers through workloads (recommended pattern)
+from cpln.config import WorkloadConfig
+
+config = WorkloadConfig(gvc="my-gvc", workload_id="my-workload")
+workload = client.workloads.get(config)
+containers = workload.get_container_objects()
+
+# Advanced container listing with caching, retry logic, and filtering (workload-centric)
+from cpln.models.containers import AdvancedListingOptions
+
+options = AdvancedListingOptions(
+    enable_cache=True,
+    cache_ttl_seconds=300,
+    enable_retry=True,
+    max_retries=3,
+    filter_unhealthy=True
+)
+
+containers, stats = client.containers.list_advanced(
+    gvc="my-gvc",
+    workload_name="my-workload",
+    options=options
+)
+
+print(f"Found {len(containers)} containers in {stats.duration_seconds:.2f}s")
+print(f"API calls: {stats.api_calls_made}, Cache hits: {stats.cache_hits}")
+
+# Count containers efficiently for a specific workload
+count = client.containers.count_containers(gvc="my-gvc", workload_name="my-workload")
+print(f"Total containers in workload: {count}")
+
+# For multi-workload operations, iterate through workloads individually
+workloads = client.workloads.list(gvc="my-gvc")
+all_containers = []
+
+for workload in workloads:
+    workload_containers = workload.get_container_objects()
+    all_containers.extend(workload_containers)
+    print(f"Workload {workload.attrs['name']}: {len(workload_containers)} containers")
+
+# Get container details
+for container in containers:
+    utilization = container.get_resource_utilization()
+    if utilization["cpu"] or utilization["memory"]:
+        print(f"Resource usage - CPU: {utilization['cpu']}%, Memory: {utilization['memory']}%")
 ```
 
 ### Advanced Workload Operations

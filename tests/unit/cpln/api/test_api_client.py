@@ -223,3 +223,35 @@ def test_api_client_post_error(mock_api_client):
         json=test_data,
         headers={"Authorization": f"Bearer {os.getenv('CPLN_TOKEN')}"},
     )
+
+
+def test_api_client_post_error_invalid_json(mock_api_client):
+    # Set up the mock response for error with invalid JSON
+    mock_api_client._mock_post_response.status_code = 400
+    mock_api_client._mock_post_response.text = "Bad Request"
+    # Make json() method raise an exception
+    mock_api_client._mock_post_response.json.side_effect = ValueError("Invalid JSON")
+
+    # Test data
+    test_data = {"invalid": "data"}
+
+    # Test that APIError exception is raised
+    with pytest.raises(APIError) as exc_info:
+        mock_api_client._post("test-endpoint", test_data)
+
+    # Should fall back to text error message
+    assert "Bad Request" in str(exc_info.value)
+
+
+def test_api_client_patch_not_found(mock_api_client):
+    # Set up the mock response for 404
+    mock_api_client._mock_patch_response.status_code = 404
+
+    # Create a mock workload config
+    mock_config = Mock()
+    mock_config.gvc = "test-gvc"
+    mock_config.workload_id = "test-workload"
+
+    # Test that NotFound exception is raised
+    with pytest.raises(NotFound):
+        mock_api_client.patch_workload(config=mock_config, data={})

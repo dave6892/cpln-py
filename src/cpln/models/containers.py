@@ -1,6 +1,9 @@
-from dataclasses import dataclass
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ..config import WorkloadConfig
 from ..errors import APIError
@@ -451,6 +454,137 @@ class ContainerParser:
         return containers
 
 
+@dataclass
+class AdvancedListingOptions:
+    """
+    Configuration options for advanced container listing features.
+    """
+
+    # Parallel processing
+    enable_parallel: bool = True
+    max_workers: int = 5
+
+    # Caching
+    enable_cache: bool = True
+    cache_ttl_seconds: int = 300  # 5 minutes
+
+    # Pagination
+    enable_pagination: bool = False
+    page_size: int = 50
+    max_results: Optional[int] = None
+
+    # Retry logic
+    enable_retry: bool = True
+    max_retries: int = 3
+    retry_delay_seconds: float = 1.0
+    retry_backoff_factor: float = 2.0
+
+    # Progress callbacks
+    progress_callback: Optional[Callable[[str, int, int], None]] = None
+
+    # Filtering
+    filter_unhealthy: bool = False
+    include_system_containers: bool = False
+
+    # Statistics
+    collect_statistics: bool = True
+
+
+@dataclass
+class ContainerListingStatistics:
+    """
+    Statistics collected during container listing operations.
+    """
+
+    start_time: datetime = field(default_factory=datetime.now)
+    end_time: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+
+    total_workloads_processed: int = 0
+    successful_workloads: int = 0
+    failed_workloads: int = 0
+
+    total_containers_found: int = 0
+    healthy_containers: int = 0
+    unhealthy_containers: int = 0
+
+    cache_hits: int = 0
+    cache_misses: int = 0
+    api_calls_made: int = 0
+
+    errors: List[str] = field(default_factory=list)
+
+    def finalize(self) -> None:
+        """Mark the statistics collection as complete."""
+        self.end_time = datetime.now()
+        self.duration_seconds = (self.end_time - self.start_time).total_seconds()
+
+
+@dataclass
+class CacheEntry:
+    """
+    Cache entry for storing container data with TTL.
+    """
+
+    data: List[Container]
+    timestamp: datetime
+    ttl_seconds: int
+
+    def is_expired(self) -> bool:
+        """Check if the cache entry has expired."""
+        age = (datetime.now() - self.timestamp).total_seconds()
+        return age > self.ttl_seconds
+
+
+class ContainerCache:
+    """
+    Simple in-memory cache for container data with TTL support.
+    """
+
+    def __init__(self):
+        self._cache: Dict[str, CacheEntry] = {}
+        self._lock = threading.RLock()
+
+    def get(self, key: str) -> Optional[List[Container]]:
+        """Get cached data if not expired."""
+        with self._lock:
+            entry = self._cache.get(key)
+            if entry and not entry.is_expired():
+                return entry.data
+            elif entry:
+                # Remove expired entry
+                del self._cache[key]
+            return None
+
+    def set(self, key: str, data: List[Container], ttl_seconds: int) -> None:
+        """Store data in cache with TTL."""
+        with self._lock:
+            self._cache[key] = CacheEntry(
+                data=data, timestamp=datetime.now(), ttl_seconds=ttl_seconds
+            )
+
+    def clear(self) -> None:
+        """Clear all cached data."""
+        with self._lock:
+            self._cache.clear()
+
+    def remove(self, key: str) -> None:
+        """Remove specific cache entry."""
+        with self._lock:
+            self._cache.pop(key, None)
+
+    def get_size(self) -> int:
+        """Get number of cached entries."""
+        with self._lock:
+            # Clean up expired entries first
+            expired_keys = [
+                key for key, entry in self._cache.items() if entry.is_expired()
+            ]
+            for key in expired_keys:
+                del self._cache[key]
+            return len(self._cache)
+
+
 class ContainerCollection(Collection):
     """
     A collection of containers that provides listing and search functionality.
@@ -461,37 +595,48 @@ class ContainerCollection(Collection):
 
     model = Container
 
+    def __init__(self, client):
+        super().__init__(client)
+        self._cache = ContainerCache()
+
     def list(
         self,
         gvc: str,
-        workload_name: str,
+        workload_name: Optional[str] = None,
         location: Optional[str] = None,
     ) -> List[Container]:
         """
-        List containers for a SPECIFIC workload only.
+        List containers for a specific workload (workload-centric approach).
 
         Args:
             gvc: Name of the GVC
-            workload_name: Name of the workload (REQUIRED)
+            workload_name: Name of the specific workload
             location: Optional location filter
 
         Returns:
-            List of Container instances
-
-        Note:
-            For multi-workload container listing, iterate through workloads:
-
-            for workload in client.workloads.list(gvc='my-gvc'):
-                containers = workload.get_container_objects()
-                # ... process containers
+            List of Container instances for the specified workload
 
         Raises:
             APIError: If the API request fails
+            ValueError: If workload_name is not provided
+
+        Note:
+            This method follows the workload-centric design pattern.
+            To access containers across multiple workloads, use the
+            workload.get_container_objects() method on each workload individually.
         """
-        # Only handle single workload's containers
+        if not workload_name:
+            raise ValueError(
+                "workload_name is required. Container access should be workload-centric. "
+                "Use workload.get_container_objects() to access containers through workloads."
+            )
+
+        # Get workloads in the GVC
         workload_config = WorkloadConfig(gvc=gvc, workload_id=workload_name)
 
-        return self._get_workload_containers(workload_config, location)
+        # List containers for the specific workload
+        containers = self._get_workload_containers(workload_config, location)
+        return containers
 
     def _get_workload_containers(
         self,
@@ -503,8 +648,7 @@ class ContainerCollection(Collection):
 
         Args:
             workload_config: Workload configuration
-            location_filter: Optional location filter to only get containers
-                          from a specific deployment location (e.g., 'aws-us-east-1')
+            location_filter: Optional location filter
 
         Returns:
             List of Container instances
@@ -513,7 +657,7 @@ class ContainerCollection(Collection):
 
         try:
             # Get workload details to find available locations
-            workload_data = self._get_workload_data(workload_config)
+            workload_data = self.client.api.get_workload(workload_config)
 
             # If no location filter, try to get deployments from workload spec
             if location_filter:
@@ -524,62 +668,39 @@ class ContainerCollection(Collection):
 
             for location in locations:
                 try:
-                    deployment_containers = self._get_deployment_containers(
-                        workload_config, location
+                    # Get deployment data for this location
+                    deployment_config = WorkloadConfig(
+                        gvc=workload_config.gvc,
+                        workload_id=workload_config.workload_id,
+                        location=location,
                     )
+
+                    deployment_data = self.client.api.get_workload_deployment(
+                        deployment_config
+                    )
+
+                    # Parse containers from deployment data
+                    deployment_containers = ContainerParser.parse_deployment_containers(
+                        deployment_data=deployment_data,
+                        workload_name=workload_config.workload_id,
+                        gvc_name=workload_config.gvc,
+                        location=location,
+                    )
+
                     containers.extend(deployment_containers)
 
-                except (APIError, Exception):
-                    # Skip locations where deployment data is not available
+                except APIError:
+                    # Re-raise APIError so it can be handled by retry logic
+                    raise
+                except Exception:
+                    # Skip locations where deployment data is not available for other errors
                     continue
 
         except APIError:
-            # Skip workloads that can't be accessed
-            pass
+            # Re-raise APIError so it can be handled by retry logic
+            raise
 
         return containers
-
-    def _get_workload_data(self, workload_config: WorkloadConfig) -> Dict[str, Any]:
-        """
-        Get workload data from the API.
-
-        Args:
-            workload_config: Workload configuration
-
-        Returns:
-            Workload data dictionary
-        """
-        return self.client.api.get_workload(workload_config)
-
-    def _get_deployment_containers(
-        self, workload_config: WorkloadConfig, location: str
-    ) -> List[Container]:
-        """
-        Get containers for a specific workload deployment.
-
-        Args:
-            workload_config: Workload configuration
-            location: Deployment location
-
-        Returns:
-            List of Container instances
-        """
-        # Get deployment data for this location
-        deployment_config = WorkloadConfig(
-            gvc=workload_config.gvc,
-            workload_id=workload_config.workload_id,
-            location=location,
-        )
-
-        deployment_data = self.client.api.get_workload_deployment(deployment_config)
-
-        # Parse containers from deployment data
-        return ContainerParser.parse_deployment_containers(
-            deployment_data=deployment_data,
-            workload_name=workload_config.workload_id,
-            gvc_name=workload_config.gvc,
-            location=location,
-        )
 
     def _infer_workload_locations(self, workload_data: Dict[str, Any]) -> List[str]:
         """
@@ -615,55 +736,17 @@ class ContainerCollection(Collection):
 
         return locations
 
-    def get(self, **kwargs) -> Optional[Container]:
+    def get(self, **kwargs) -> Container:
         """
-        Get a specific container by name within a workload.
-
-        For containers, you must provide:
-        - gvc: Name of the GVC
-        - workload_name: Name of the workload
-        - container_name: Name of the container to find
-        - location: Optional location filter to search in specific deployment
-
-        Args:
-            **kwargs: Container search parameters
-
-        Returns:
-            Container instance if found, None otherwise
+        Get a specific container (not implemented for read-only model).
 
         Raises:
-            ValueError: If required parameters are missing
-            APIError: If the API request fails
-            NotImplementedError: If called with unsupported parameters (like 'id')
+            NotImplementedError: Containers are read-only in this implementation
         """
-        # Check for the old-style 'id' parameter that tests might use
-        if "id" in kwargs:
-            raise NotImplementedError(
-                "Container retrieval by ID is not supported. "
-                "Use get(gvc='name', workload_name='name', container_name='name') instead."
-            )
-
-        # Extract required parameters
-        gvc = kwargs.get("gvc")
-        workload_name = kwargs.get("workload_name")
-        container_name = kwargs.get("container_name")
-        location = kwargs.get("location")
-
-        # Validate required parameters
-        if not all([gvc, workload_name, container_name]):
-            raise ValueError(
-                "get() requires 'gvc', 'workload_name', and 'container_name' parameters"
-            )
-
-        # List all containers for the workload
-        containers = self.list(gvc=gvc, workload_name=workload_name, location=location)
-
-        # Find the specific container by name
-        for container in containers:
-            if container.name == container_name:
-                return container
-
-        return None
+        raise NotImplementedError(
+            "Container retrieval by ID is not supported. "
+            "Use list() method with filters instead."
+        )
 
     def create(self, **kwargs) -> Container:
         """
@@ -676,3 +759,331 @@ class ContainerCollection(Collection):
             "Container creation is not supported. "
             "Containers are managed through workload deployments."
         )
+
+    def list_advanced(
+        self,
+        gvc: str,
+        workload_name: str,
+        location: Optional[str] = None,
+        options: Optional[AdvancedListingOptions] = None,
+    ) -> Tuple[List[Container], ContainerListingStatistics]:
+        """
+        List containers for a specific workload with advanced features like caching, retry logic, and statistics.
+
+        Args:
+            gvc: Name of the GVC
+            workload_name: Name of the specific workload
+            location: Optional location filter
+            options: Advanced listing options
+
+        Returns:
+            Tuple of (containers list, statistics)
+
+        Note:
+            This method follows the workload-centric design pattern.
+            For cross-workload operations, use this method on each workload individually.
+        """
+        if not workload_name:
+            raise ValueError(
+                "workload_name is required. Container access should be workload-centric. "
+                "Use workload.get_container_objects() to access containers through workloads."
+            )
+
+        if options is None:
+            options = AdvancedListingOptions()
+
+        stats = ContainerListingStatistics() if options.collect_statistics else None
+
+        # Check cache first
+        if options.enable_cache:
+            cache_key = self._generate_cache_key(gvc, location, workload_name)
+            cached_containers = self._cache.get(cache_key)
+            if cached_containers is not None:
+                if stats:
+                    stats.cache_hits += 1
+                    stats.total_containers_found = len(cached_containers)
+                    stats.finalize()
+                return cached_containers, stats
+            elif stats:
+                stats.cache_misses += 1
+
+        # Fetch containers for the specific workload
+        containers = self._list_containers_sequential(
+            gvc, location, workload_name, options, stats
+        )
+
+        # Apply filtering
+        if options.filter_unhealthy:
+            containers = [c for c in containers if c.is_healthy()]
+
+        if not options.include_system_containers:
+            containers = [
+                c
+                for c in containers
+                if c.name not in ContainerParser.IGNORED_CONTAINERS
+            ]
+
+        # Apply pagination
+        if options.enable_pagination:
+            containers = self._apply_pagination(containers, options)
+
+        # Update statistics
+        if stats:
+            stats.total_containers_found = len(containers)
+            stats.healthy_containers = sum(1 for c in containers if c.is_healthy())
+            stats.unhealthy_containers = (
+                stats.total_containers_found - stats.healthy_containers
+            )
+            stats.finalize()
+
+        # Cache results
+        if options.enable_cache:
+            cache_key = self._generate_cache_key(gvc, location, workload_name)
+            self._cache.set(cache_key, containers, options.cache_ttl_seconds)
+
+        return containers, stats
+
+    def _list_containers_parallel(
+        self,
+        gvc: str,
+        location: Optional[str],
+        options: AdvancedListingOptions,
+        stats: Optional[ContainerListingStatistics],
+    ) -> List[Container]:
+        """
+        List containers using parallel processing for better performance.
+        """
+        containers = []
+
+        # Get workloads list first
+        workload_config = WorkloadConfig(gvc=gvc)
+
+        try:
+            workloads_data = self.client.api.get_workload(workload_config)
+            if stats:
+                stats.api_calls_made += 1
+        except APIError as e:
+            if stats:
+                stats.errors.append(f"Failed to get workloads: {e}")
+            return containers
+
+        workloads = workloads_data.get("items", [])
+        total_workloads = len(workloads)
+
+        if stats:
+            stats.total_workloads_processed = total_workloads
+
+        # Process workloads in parallel
+        with ThreadPoolExecutor(max_workers=options.max_workers) as executor:
+            # Submit all workload processing tasks
+            future_to_workload = {
+                executor.submit(
+                    self._get_workload_containers_with_retry,
+                    WorkloadConfig(gvc=gvc, workload_id=workload.get("name")),
+                    location,
+                    options,
+                ): workload.get("name")
+                for workload in workloads
+                if workload.get("name")
+            }
+
+            # Collect results as they complete
+            completed = 0
+            for future in as_completed(future_to_workload):
+                workload_name = future_to_workload[future]
+                completed += 1
+
+                # Call progress callback if provided
+                if options.progress_callback:
+                    options.progress_callback(
+                        "Processing workloads", completed, total_workloads
+                    )
+
+                try:
+                    workload_containers = future.result()
+                    containers.extend(workload_containers)
+                    if stats:
+                        stats.successful_workloads += 1
+                except Exception as e:
+                    if stats:
+                        stats.failed_workloads += 1
+                        stats.errors.append(
+                            f"Failed to process workload {workload_name}: {e}"
+                        )
+
+        return containers
+
+    def _list_containers_sequential(
+        self,
+        gvc: str,
+        location: Optional[str],
+        workload_name: Optional[str],
+        options: AdvancedListingOptions,
+        stats: Optional[ContainerListingStatistics],
+    ) -> List[Container]:
+        """
+        List containers using sequential processing.
+        """
+        containers = []
+        workload_config = WorkloadConfig(gvc=gvc)
+
+        if workload_name:
+            # Process single workload
+            workload_config.workload_id = workload_name
+
+            # Call progress callback if provided
+            if options.progress_callback:
+                options.progress_callback("Processing workloads", 1, 1)
+
+            workload_containers = self._get_workload_containers_with_retry(
+                workload_config, location, options
+            )
+            containers.extend(workload_containers)
+
+            if stats:
+                stats.total_workloads_processed = 1
+                stats.successful_workloads = 1 if workload_containers else 0
+                stats.failed_workloads = 0 if workload_containers else 1
+        else:
+            # Process all workloads
+            try:
+                workloads_data = self.client.api.get_workload(workload_config)
+                if stats:
+                    stats.api_calls_made += 1
+            except APIError as e:
+                if stats:
+                    stats.errors.append(f"Failed to get workloads: {e}")
+                return containers
+
+            workloads = workloads_data.get("items", [])
+            total_workloads = len(workloads)
+
+            if stats:
+                stats.total_workloads_processed = total_workloads
+
+            for idx, workload in enumerate(workloads):
+                workload_name = workload.get("name")
+                if not workload_name:
+                    continue
+
+                # Call progress callback if provided
+                if options.progress_callback:
+                    options.progress_callback(
+                        "Processing workloads", idx + 1, total_workloads
+                    )
+
+                workload_config.workload_id = workload_name
+
+                try:
+                    workload_containers = self._get_workload_containers_with_retry(
+                        workload_config, location, options
+                    )
+                    containers.extend(workload_containers)
+                    if stats:
+                        stats.successful_workloads += 1
+                except Exception as e:
+                    if stats:
+                        stats.failed_workloads += 1
+                        stats.errors.append(
+                            f"Failed to process workload {workload_name}: {e}"
+                        )
+
+        return containers
+
+    def _get_workload_containers_with_retry(
+        self,
+        workload_config: WorkloadConfig,
+        location_filter: Optional[str],
+        options: AdvancedListingOptions,
+    ) -> List[Container]:
+        """
+        Get containers for a workload with retry logic.
+        """
+        if not options.enable_retry:
+            return self._get_workload_containers(workload_config, location_filter)
+
+        retry_count = 0
+        delay = options.retry_delay_seconds
+
+        while retry_count <= options.max_retries:
+            try:
+                return self._get_workload_containers(workload_config, location_filter)
+            except APIError as e:
+                retry_count += 1
+
+                if retry_count > options.max_retries:
+                    raise e
+
+                # Check if this is a rate limiting error that should be retried
+                if "rate limit" in str(e).lower() or "429" in str(e):
+                    time.sleep(delay)
+                    delay *= options.retry_backoff_factor
+                else:
+                    # For other errors, don't retry
+                    raise e
+
+        return []
+
+    def _apply_pagination(
+        self, containers: List[Container], options: AdvancedListingOptions
+    ) -> List[Container]:
+        """
+        Apply pagination to container results.
+        """
+        if options.max_results:
+            containers = containers[: options.max_results]
+
+        return containers
+
+    def _generate_cache_key(
+        self, gvc: str, location: Optional[str], workload_name: Optional[str]
+    ) -> str:
+        """
+        Generate a cache key for the given parameters.
+        """
+        parts = [gvc]
+        if location:
+            parts.append(f"loc:{location}")
+        if workload_name:
+            parts.append(f"wl:{workload_name}")
+        return "|".join(parts)
+
+    def clear_cache(self) -> None:
+        """
+        Clear all cached container data.
+        """
+        self._cache.clear()
+
+    def get_cache_size(self) -> int:
+        """
+        Get the number of cached entries.
+
+        Returns:
+            Number of cached entries
+        """
+        return self._cache.get_size()
+
+    def count_containers(
+        self,
+        gvc: str,
+        workload_name: str,
+        location: Optional[str] = None,
+        options: Optional[AdvancedListingOptions] = None,
+    ) -> int:
+        """
+        Count containers for a specific workload without returning the full list.
+
+        Args:
+            gvc: Name of the GVC
+            workload_name: Name of the specific workload
+            location: Optional location filter
+            options: Advanced listing options
+
+        Returns:
+            Number of containers in the specified workload
+
+        Note:
+            This method follows the workload-centric design pattern.
+        """
+        containers, _ = self.list_advanced(gvc, workload_name, location, options)
+        return len(containers)
