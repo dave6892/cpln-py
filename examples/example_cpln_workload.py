@@ -66,6 +66,14 @@ def main() -> None:
 
         # List workloads
         gvc_name = "david"  # You might want to make this configurable
+
+        # Check if the user provided a GVC name as command line argument
+        if len(sys.argv) > 1:
+            gvc_name = sys.argv[1]
+        else:
+            print(f"\nUsing default GVC name: {gvc_name}")
+            print(f"You can specify a different GVC: python {sys.argv[0]} <gvc-name>")
+
         workloads = list_workloads(client, gvc_name)
 
         # Print workload information

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from cpln.config import WorkloadConfig
 from cpln.errors import WebSocketExitCodeError
+from cpln.models.containers import Container
 from cpln.models.workloads import Workload, WorkloadCollection
 from requests import Response
 
@@ -410,6 +411,122 @@ class TestWorkload(unittest.TestCase):
 
         # Verify API call was attempted
         self.client.api.create_workload.assert_called_once()
+
+    @patch("cpln.models.containers.ContainerParser.parse_deployment_containers")
+    def test_get_container_objects(self, mock_parse: MagicMock) -> None:
+        """Test get_container_objects method"""
+        # Setup test data
+        location = "aws-us-east-1"
+        mock_containers = [
+            Container(
+                name="app-container",
+                image="nginx:latest",
+                workload_name=self.attrs["name"],
+                gvc_name=self.state["gvc"],
+                location=location,
+            )
+        ]
+
+        # Mock the parser to return containers
+        mock_parse.return_value = mock_containers
+
+        # Mock API responses
+        self.client.api.get_workload_deployment.return_value = {
+            "status": {"versions": []}
+        }
+
+        # Call method
+        result = self.workload.get_container_objects(location=location)
+
+        # Verify result
+        self.assertEqual(result, mock_containers)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "app-container")
+
+        # Verify API call
+        self.client.api.get_workload_deployment.assert_called_once()
+
+        # Verify parser was called
+        mock_parse.assert_called_once()
+
+    @patch("cpln.models.containers.ContainerParser.parse_deployment_containers")
+    def test_get_container_objects_no_location(self, mock_parse: MagicMock) -> None:
+        """Test get_container_objects method without location (uses all locations)"""
+        # Setup test data
+        mock_containers = [
+            Container(
+                name="app-container",
+                image="nginx:latest",
+                workload_name=self.attrs["name"],
+                gvc_name=self.state["gvc"],
+                location="aws-us-east-1",
+            )
+        ]
+
+        # Mock the parser to return containers
+        mock_parse.return_value = mock_containers
+
+        # Mock API responses
+        self.client.api.get_workload_deployment.return_value = {
+            "status": {"versions": []}
+        }
+
+        # Call method without location
+        result = self.workload.get_container_objects()
+
+        # Should try multiple locations (due to location inference)
+        self.assertIsInstance(result, list)
+
+        # Verify API calls were made (potentially multiple for different locations)
+        self.assertTrue(self.client.api.get_workload_deployment.called)
+
+    def test_get_container_not_found(self) -> None:
+        """Test get_container method when container is not found"""
+        # Setup test data
+        container_name = "non-existent-container"
+        mock_containers = [
+            Container(
+                name="app-container",
+                image="nginx:latest",
+                workload_name=self.attrs["name"],
+                gvc_name=self.state["gvc"],
+                location="aws-us-east-1",
+            )
+        ]
+
+        # Mock get_container_objects to return containers
+        with patch.object(
+            self.workload, "get_container_objects", return_value=mock_containers
+        ):
+            # Call method
+            result = self.workload.get_container(container_name)
+
+            # Verify result
+            self.assertIsNone(result)
+
+    def test_get_workload_locations_with_spec(self) -> None:
+        """Test _get_workload_locations method with locations in spec"""
+        # Update workload attrs to include locations
+        self.workload.attrs["spec"]["defaultOptions"]["locations"] = [
+            "aws-us-east-1",
+            "aws-us-west-2",
+        ]
+
+        # Call method
+        locations = self.workload._get_workload_locations()
+
+        # Verify result
+        self.assertEqual(locations, ["aws-us-east-1", "aws-us-west-2"])
+
+    def test_get_workload_locations_fallback(self) -> None:
+        """Test _get_workload_locations method fallback to common locations"""
+        # Call method (no locations in spec)
+        locations = self.workload._get_workload_locations()
+
+        # Verify result contains common locations
+        self.assertIn("aws-us-east-1", locations)
+        self.assertIn("aws-us-west-2", locations)
+        self.assertIn("aws-eu-west-1", locations)
 
 
 class TestWorkloadCollection(unittest.TestCase):

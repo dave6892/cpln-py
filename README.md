@@ -5,18 +5,20 @@
 [![PyPI version](https://badge.fury.io/py/cpln-py.svg)](https://badge.fury.io/py/cpln-py)
 [![codecov](https://codecov.io/gh/dave6892/cpln-py/graph/badge.svg?token=WRK7S1Z16G)](https://codecov.io/gh/dave6892/cpln-py)
 
-A comprehensive Python library for interacting with the [Control Plane](https://controlplane.com) API. This SDK provides a Pythonic interface to manage GVCs (Global Virtual Clouds), workloads, images, and other Control Plane resources programmatically.
+A comprehensive Python library for interacting with the [Control Plane](https://controlplane.com) API. This SDK provides a Pythonic interface to manage GVCs (Global Virtual Clouds), workloads, containers, images, and other Control Plane resources programmatically.
 
 ## Features
 
 - **🚀 Easy-to-use client interface** - Simple Python client for Control Plane API
 - **🔧 Workload Management** - Create, deploy, manage, and execute commands in workloads
+- **📦 Container Operations** - Comprehensive container visibility and management with workload-centric architecture
 - **🖼️ Image Management** - Handle container images in Control Plane registry
 - **🌐 GVC Operations** - Manage Global Virtual Clouds and their configurations
 - **⚡ WebSocket Support** - Real-time command execution with proper error handling
 - **🔐 Authentication** - Secure API access with token-based authentication
 - **🧪 Well-tested** - Comprehensive test suite with high coverage
 - **📚 Type Hints** - Full type annotation support for better development experience
+- **🏗️ Clean Architecture** - Workload-centric design with clear separation of concerns
 
 ## Installation
 
@@ -39,9 +41,10 @@ cd cpln-py
 make install
 
 # Run examples to verify installation
-pdm run python examples/example_cpln_gvc.py
-pdm run python examples/example_cpln_images.py
-pdm run python examples/example_cpln_workload.py
+pdm run python examples/example_cpln_gvc.py <gvc-name>
+pdm run python examples/example_cpln_images.py <gvc-name>
+pdm run python examples/example_cpln_workload.py <gvc-name>
+pdm run python examples/example_cpln_containers.py <gvc-name>
 ```
 
 ## Requirements

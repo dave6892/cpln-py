@@ -1,10 +1,13 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
 from ..utils import get_default_workload_template, load_template
 from .resource import Collection, Model
 from .workload_specs import WorkloadSpecState
+
+if TYPE_CHECKING:
+    from .containers import Container
 
 
 class Workload(Model):
@@ -229,16 +232,116 @@ class Workload(Model):
 
     def get_containers(self, location: Optional[str] = None) -> list[str]:
         """
-        Get the containers of the workload.
+        Get the containers of the workload (legacy method returning container names).
 
         Args:
             location (str): The location of the workload.
                 Default: None
 
         Returns:
-            (list): The containers of the workload.
+            (list): The container names of the workload.
+
+        Note:
+            This method is deprecated. Use get_container_objects() for full Container instances.
         """
         return self.client.api.get_containers(self.config(location=location))
+
+    def get_container_objects(self, location: Optional[str] = None):
+        """
+        Get containers for this workload with full Container objects.
+
+        Args:
+            location: Optional location filter
+
+        Returns:
+            List of Container instances with full metadata
+        """
+        from .containers import ContainerParser  # Import here to avoid circular imports
+
+        # Get all locations for this workload
+        locations = [location] if location else self._get_workload_locations()
+
+        containers = []
+        for loc in locations:
+            try:
+                deployment_data = self.client.api.get_workload_deployment(
+                    self.config(location=loc)
+                )
+
+                workload_containers = ContainerParser.parse_deployment_containers(
+                    deployment_data=deployment_data,
+                    workload_name=self.attrs["name"],
+                    gvc_name=self.state["gvc"],
+                    location=loc,
+                )
+                containers.extend(workload_containers)
+
+            except Exception:
+                # Skip locations where deployment data is unavailable
+                continue
+
+        return containers
+
+    def get_container(
+        self, container_name: str, location: Optional[str] = None
+    ) -> Optional["Container"]:
+        """
+        Get a specific container by name within this workload.
+
+        Args:
+            container_name: Name of the container to find
+            location: Optional location filter
+
+        Returns:
+            Container instance if found, None otherwise
+        """
+        containers = self.get_container_objects(location=location)
+        for container in containers:
+            if container.name == container_name:
+                return container
+        return None
+
+    def _get_workload_locations(self) -> list[str]:
+        """
+        Get available locations for this workload.
+
+        Returns:
+            List of location names where this workload is deployed
+        """
+        # Try to extract locations from workload spec
+        locations = []
+
+        try:
+            # Check if locations are specified in workload spec
+            spec = self.attrs.get("spec", {})
+            default_options = spec.get("defaultOptions", {})
+
+            # Look for location hints in various places
+            if "locations" in default_options:
+                locations.extend(default_options["locations"])
+
+            # If no locations found, try common location names
+            if not locations:
+                common_locations = [
+                    "aws-us-east-1",
+                    "aws-us-west-2",
+                    "aws-eu-west-1",
+                    "gcp-us-central1",
+                    "azure-eastus",
+                ]
+                locations = common_locations
+
+        except (KeyError, TypeError):
+            # Fallback to common locations if spec parsing fails
+            locations = [
+                "aws-us-east-1",
+                "aws-us-west-2",
+                "aws-eu-west-1",
+                "gcp-us-central1",
+                "azure-eastus",
+            ]
+
+        return locations
 
     def _change_suspend_state(self, state: bool = True) -> None:
         output = self.client.api.patch_workload(
