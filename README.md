@@ -179,6 +179,53 @@ config_data = workload.export()
 print(f"Workload config: {config_data}")
 ```
 
+### Managing Containers
+
+```python
+# List all containers in a GVC
+containers = client.containers.list(gvc="my-gvc")
+for container in containers:
+    print(f"Container: {container.name} ({container.image})")
+    print(f"  Workload: {container.workload_name}")
+    print(f"  Location: {container.location}")
+    print(f"  Healthy: {container.is_healthy()}")
+
+# List containers for specific workload
+containers = client.containers.list(gvc="my-gvc", workload_name="my-workload")
+
+# List containers in specific location
+containers = client.containers.list(gvc="my-gvc", location="aws-us-west-2")
+
+# Advanced container listing with caching and parallel processing
+from cpln.models.containers import AdvancedListingOptions
+
+options = AdvancedListingOptions(
+    enable_parallel=True,
+    max_workers=10,
+    enable_cache=True,
+    cache_ttl_seconds=300,
+    filter_unhealthy=True
+)
+
+containers, stats = client.containers.list_advanced(
+    gvc="my-gvc",
+    options=options
+)
+
+print(f"Found {len(containers)} containers in {stats.duration_seconds:.2f}s")
+print(f"API calls: {stats.api_calls_made}, Cache hits: {stats.cache_hits}")
+
+# Count containers efficiently
+count = client.containers.count_containers(gvc="my-gvc")
+print(f"Total containers: {count}")
+
+# Get container details
+for container in containers:
+    utilization = container.get_resource_utilization()
+    if utilization["cpu"] or utilization["memory"]:
+        print(f"Resource usage - CPU: {utilization['cpu']}%, Memory: {utilization['memory']}%")
+```
+
 ### Advanced Workload Operations
 
 ```python
