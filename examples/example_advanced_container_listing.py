@@ -53,9 +53,9 @@ def progress_callback(stage: str, current: int, total: int) -> None:
 
 def demonstrate_basic_advanced_listing():
     """
-    Demonstrate basic advanced listing with default options.
+    Demonstrate basic advanced listing with default options (workload-centric).
     """
-    print("\n=== Basic Advanced Listing ===")
+    print("\n=== Basic Advanced Listing (Workload-Centric) ===")
 
     # Create a mock client for demonstration
     from unittest.mock import MagicMock
@@ -66,56 +66,64 @@ def demonstrate_basic_advanced_listing():
     collection = ContainerCollection(client=mock_client)
 
     # Mock some API responses
-    mock_client.api.get_workload.return_value = {"items": []}
+    mock_client.api.get_workload.return_value = {"name": "example-workload"}
+    mock_client.api.get_workload_deployment.return_value = {
+        "metadata": {"name": "test-deployment"},
+        "status": {"versions": []},
+    }
 
-    # Use advanced listing with default options
+    # Use advanced listing with workload-centric approach
     containers, stats = collection.list_advanced(
-        gvc="example-gvc", location="aws-us-west-2"
+        gvc="example-gvc", workload_name="example-workload", location="aws-us-west-2"
     )
 
-    print(f"Found {len(containers)} containers")
+    print(f"Found {len(containers)} containers for workload 'example-workload'")
     print(f"Processing took {stats.duration_seconds:.2f} seconds")
     print(f"API calls made: {stats.api_calls_made}")
     print(f"Cache hits: {stats.cache_hits}, misses: {stats.cache_misses}")
 
 
-def demonstrate_parallel_processing():
+def demonstrate_advanced_features_for_workload():
     """
-    Demonstrate parallel processing for better performance.
+    Demonstrate advanced features for a specific workload (workload-centric).
     """
-    print("\n=== Parallel Processing ===")
+    print("\n=== Advanced Features for Specific Workload ===")
 
     from unittest.mock import MagicMock
 
     mock_client = MagicMock()
     collection = ContainerCollection(client=mock_client)
 
-    # Configure parallel processing options
+    # Configure advanced options
     options = AdvancedListingOptions(
-        enable_parallel=True,
-        max_workers=8,  # Use more workers for large deployments
         enable_cache=True,
         cache_ttl_seconds=600,  # 10 minutes cache
+        enable_retry=True,
+        max_retries=3,
+        retry_delay_seconds=1.0,
         progress_callback=progress_callback,
+        filter_unhealthy=True,
     )
 
-    # Mock API responses for multiple workloads
-    mock_client.api.get_workload.return_value = {
-        "items": [{"name": f"workload-{i}"} for i in range(5)]
-    }
+    # Mock API responses for a specific workload
+    mock_client.api.get_workload.return_value = {"name": "example-workload"}
     mock_client.api.get_workload_deployment.return_value = {
         "metadata": {"name": "test-deployment"},
         "status": {"versions": []},
     }
 
     start_time = time.time()
-    containers, stats = collection.list_advanced(gvc="example-gvc", options=options)
+    containers, stats = collection.list_advanced(
+        gvc="example-gvc", workload_name="example-workload", options=options
+    )
     end_time = time.time()
 
-    print(f"Parallel processing completed in {end_time - start_time:.2f} seconds")
-    print(f"Found {stats.total_containers_found} containers")
+    print(f"Advanced processing completed in {end_time - start_time:.2f} seconds")
     print(
-        f"Successfully processed {stats.successful_workloads}/{stats.total_workloads_processed} workloads"
+        f"Found {stats.total_containers_found} containers for workload 'example-workload'"
+    )
+    print(
+        f"Processed {stats.successful_workloads}/{stats.total_workloads_processed} workload(s)"
     )
     if stats.failed_workloads > 0:
         print(f"Failed workloads: {stats.failed_workloads}")
@@ -125,9 +133,9 @@ def demonstrate_parallel_processing():
 
 def demonstrate_caching():
     """
-    Demonstrate caching functionality with TTL.
+    Demonstrate caching functionality with TTL (workload-centric).
     """
-    print("\n=== Caching Demonstration ===")
+    print("\n=== Caching Demonstration (Workload-Centric) ===")
 
     from unittest.mock import MagicMock
 
@@ -142,14 +150,21 @@ def demonstrate_caching():
     )
 
     # Mock API responses
-    mock_client.api.get_workload.return_value = {"items": []}
+    mock_client.api.get_workload.return_value = {"name": "example-workload"}
+    mock_client.api.get_workload_deployment.return_value = {
+        "metadata": {"name": "test-deployment"},
+        "status": {"versions": []},
+    }
 
     print(f"Cache size before: {collection.get_cache_size()}")
 
     # First call - should be a cache miss
     print("\nFirst call (cache miss):")
     containers1, stats1 = collection.list_advanced(
-        gvc="example-gvc", location="aws-us-west-2", options=options
+        gvc="example-gvc",
+        workload_name="example-workload",
+        location="aws-us-west-2",
+        options=options,
     )
     print(f"Cache hits: {stats1.cache_hits}, misses: {stats1.cache_misses}")
     print(f"Cache size after: {collection.get_cache_size()}")
@@ -157,7 +172,10 @@ def demonstrate_caching():
     # Second call - should be a cache hit
     print("\nSecond call (cache hit):")
     containers2, stats2 = collection.list_advanced(
-        gvc="example-gvc", location="aws-us-west-2", options=options
+        gvc="example-gvc",
+        workload_name="example-workload",
+        location="aws-us-west-2",
+        options=options,
     )
     print(f"Cache hits: {stats2.cache_hits}, misses: {stats2.cache_misses}")
 
@@ -168,9 +186,9 @@ def demonstrate_caching():
 
 def demonstrate_pagination_and_filtering():
     """
-    Demonstrate pagination and filtering features.
+    Demonstrate pagination and filtering features (workload-centric).
     """
-    print("\n=== Pagination and Filtering ===")
+    print("\n=== Pagination and Filtering (Workload-Centric) ===")
 
     from unittest.mock import MagicMock, patch
 
@@ -219,9 +237,9 @@ def demonstrate_pagination_and_filtering():
 
 def demonstrate_retry_logic():
     """
-    Demonstrate retry logic for handling rate limiting.
+    Demonstrate retry logic for handling rate limiting (workload-centric).
     """
-    print("\n=== Retry Logic Demonstration ===")
+    print("\n=== Retry Logic Demonstration (Workload-Centric) ===")
 
     from unittest.mock import MagicMock, patch
 
@@ -243,18 +261,23 @@ def demonstrate_retry_logic():
     # Simulate rate limiting error followed by success
     api_call_count = 0
 
-    def mock_get_workload(*args, **kwargs):
+    def mock_get_workload_deployment(*args, **kwargs):
         nonlocal api_call_count
         api_call_count += 1
         if api_call_count == 1:
             raise APIError("Rate limit exceeded (429)")
-        return {"items": []}
+        return {"metadata": {"name": "test-deployment"}, "status": {"versions": []}}
 
     with patch("time.sleep"):  # Mock sleep to speed up demo
-        mock_client.api.get_workload.side_effect = mock_get_workload
+        mock_client.api.get_workload.return_value = {"name": "example-workload"}
+        mock_client.api.get_workload_deployment.side_effect = (
+            mock_get_workload_deployment
+        )
 
         print("Simulating rate limiting error...")
-        containers, stats = collection.list_advanced(gvc="example-gvc", options=options)
+        containers, stats = collection.list_advanced(
+            gvc="example-gvc", workload_name="example-workload", options=options
+        )
 
         print(f"API calls made: {api_call_count}")
         print(f"Errors encountered: {len(stats.errors)}")
@@ -265,9 +288,9 @@ def demonstrate_retry_logic():
 
 def demonstrate_container_counting():
     """
-    Demonstrate efficient container counting.
+    Demonstrate efficient container counting (workload-centric).
     """
-    print("\n=== Container Counting ===")
+    print("\n=== Container Counting (Workload-Centric) ===")
 
     from unittest.mock import MagicMock
 
@@ -275,41 +298,108 @@ def demonstrate_container_counting():
     collection = ContainerCollection(client=mock_client)
 
     # Mock API responses
-    mock_client.api.get_workload.return_value = {"items": []}
+    mock_client.api.get_workload.return_value = {"name": "example-workload"}
+    mock_client.api.get_workload_deployment.return_value = {
+        "metadata": {"name": "test-deployment"},
+        "status": {"versions": []},
+    }
 
-    # Count containers efficiently
-    count = collection.count_containers(gvc="example-gvc", location="aws-us-west-2")
+    # Count containers efficiently for a specific workload
+    count = collection.count_containers(
+        gvc="example-gvc", workload_name="example-workload", location="aws-us-west-2"
+    )
 
-    print(f"Total containers in GVC: {count}")
+    print(f"Total containers in workload 'example-workload': {count}")
+
+
+def demonstrate_workload_centric_multi_workload_access():
+    """
+    Demonstrate how to access containers across multiple workloads following workload-centric pattern.
+    """
+    print("\n=== Workload-Centric Multi-Workload Access ===")
+    print(
+        "Note: This shows the proper pattern for accessing containers across workloads"
+    )
+
+    from unittest.mock import MagicMock
+
+    mock_client = MagicMock()
+    collection = ContainerCollection(client=mock_client)
+
+    # Simulate accessing multiple workloads individually
+    workloads = ["workload-1", "workload-2", "workload-3"]
+    all_containers = []
+
+    for workload_name in workloads:
+        try:
+            print(f"\n  Processing workload: {workload_name}")
+
+            # Mock API response for each workload
+            mock_client.api.get_workload.return_value = {"name": workload_name}
+            mock_client.api.get_workload_deployment.return_value = {
+                "metadata": {"name": f"deployment-{workload_name}"},
+                "status": {"versions": []},
+            }
+
+            # Get containers for this specific workload (workload-centric approach)
+            containers, stats = collection.list_advanced(
+                gvc="example-gvc", workload_name=workload_name
+            )
+
+            print(f"    Found {len(containers)} containers")
+            all_containers.extend(containers)
+
+        except Exception as e:
+            print(f"    Error processing {workload_name}: {e}")
+            continue
+
+    print(
+        f"\nTotal containers across {len(workloads)} workloads: {len(all_containers)}"
+    )
+    print(
+        "✅ This is the recommended workload-centric approach for multi-workload access"
+    )
 
 
 def main():
     """
     Main function to run all demonstrations.
     """
-    print("Advanced Container Listing Features - Issue #29 Demo")
-    print("====================================================")
+    print("Advanced Container Listing Features - Issue #29 Demo (Workload-Centric)")
+    print("======================================================================")
+    print("Note: All examples now follow the workload-centric design pattern")
 
     try:
         demonstrate_basic_advanced_listing()
-        demonstrate_parallel_processing()
+        demonstrate_advanced_features_for_workload()
         demonstrate_caching()
         demonstrate_pagination_and_filtering()
         demonstrate_retry_logic()
         demonstrate_container_counting()
+        demonstrate_workload_centric_multi_workload_access()
 
         print("\n=== Summary ===")
-        print("Successfully demonstrated all Issue #29 Phase 1 features:")
+        print(
+            "Successfully demonstrated all Issue #29 Phase 1 features (Workload-Centric):"
+        )
         print("✓ AdvancedListingOptions dataclass")
         print("✓ Cache management with TTL")
-        print("✓ Parallel workload processing")
+        print("✓ Workload-specific advanced listing")
         print("✓ Pagination with page size control")
         print("✓ Retry logic with exponential backoff")
         print("✓ Progress callback mechanism")
         print("✓ Statistics collection")
         print("✓ Filtering for unhealthy containers")
         print("✓ Cache invalidation and management")
-        print("✓ Container counting functionality")
+        print("✓ Container counting functionality (per workload)")
+        print("✓ Workload-centric multi-workload access pattern")
+
+        print("\n=== Workload-Centric Design Benefits ===")
+        print("✅ Maintains clear boundaries between workloads")
+        print("✅ Prevents accidental cross-workload access")
+        print("✅ Follows the established design pattern from PR #34")
+        print("✅ Enables workload-specific optimizations")
+        print("✅ Supports workload-level security and access control")
 
     except Exception as e:
         print(f"\nError during demonstration: {e}")

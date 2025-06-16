@@ -602,48 +602,40 @@ class ContainerCollection(Collection):
     def list(
         self,
         gvc: str,
+        workload_name: str,
         location: Optional[str] = None,
-        workload_name: Optional[str] = None,
     ) -> List[Container]:
         """
-        List containers in a GVC by iterating through workloads and deployments.
+        List containers for a specific workload (workload-centric approach).
 
         Args:
-            gvc: Name of the GVC to list containers from
+            gvc: Name of the GVC
+            workload_name: Name of the specific workload
             location: Optional location filter
-            workload_name: Optional workload name filter
 
         Returns:
-            List of Container instances
+            List of Container instances for the specified workload
 
         Raises:
             APIError: If the API request fails
+            ValueError: If workload_name is not provided
+
+        Note:
+            This method follows the workload-centric design pattern.
+            To access containers across multiple workloads, use the
+            workload.get_container_objects() method on each workload individually.
         """
-        containers = []
+        if not workload_name:
+            raise ValueError(
+                "workload_name is required. Container access should be workload-centric. "
+                "Use workload.get_container_objects() to access containers through workloads."
+            )
 
         # Get workloads in the GVC
-        workload_config = WorkloadConfig(gvc=gvc)
+        workload_config = WorkloadConfig(gvc=gvc, workload_id=workload_name)
 
-        if workload_name:
-            # List containers for a specific workload
-            workload_config.workload_id = workload_name
-            workload_containers = self._get_workload_containers(
-                workload_config, location
-            )
-            containers.extend(workload_containers)
-        else:
-            # List containers for all workloads in GVC
-            workloads_data = self.client.api.get_workload(workload_config)
-
-            for workload in workloads_data.get("items", []):
-                workload_name = workload.get("name")
-                if workload_name:
-                    workload_config.workload_id = workload_name
-                    workload_containers = self._get_workload_containers(
-                        workload_config, location
-                    )
-                    containers.extend(workload_containers)
-
+        # List containers for the specific workload
+        containers = self._get_workload_containers(workload_config, location)
         return containers
 
     def _get_workload_containers(
@@ -771,22 +763,32 @@ class ContainerCollection(Collection):
     def list_advanced(
         self,
         gvc: str,
+        workload_name: str,
         location: Optional[str] = None,
-        workload_name: Optional[str] = None,
         options: Optional[AdvancedListingOptions] = None,
     ) -> Tuple[List[Container], ContainerListingStatistics]:
         """
-        List containers with advanced features like caching, parallel processing, and statistics.
+        List containers for a specific workload with advanced features like caching, retry logic, and statistics.
 
         Args:
-            gvc: Name of the GVC to list containers from
+            gvc: Name of the GVC
+            workload_name: Name of the specific workload
             location: Optional location filter
-            workload_name: Optional workload name filter
             options: Advanced listing options
 
         Returns:
             Tuple of (containers list, statistics)
+
+        Note:
+            This method follows the workload-centric design pattern.
+            For cross-workload operations, use this method on each workload individually.
         """
+        if not workload_name:
+            raise ValueError(
+                "workload_name is required. Container access should be workload-centric. "
+                "Use workload.get_container_objects() to access containers through workloads."
+            )
+
         if options is None:
             options = AdvancedListingOptions()
 
@@ -805,13 +807,10 @@ class ContainerCollection(Collection):
             elif stats:
                 stats.cache_misses += 1
 
-        # Fetch containers with selected method
-        if options.enable_parallel and not workload_name:
-            containers = self._list_containers_parallel(gvc, location, options, stats)
-        else:
-            containers = self._list_containers_sequential(
-                gvc, location, workload_name, options, stats
-            )
+        # Fetch containers for the specific workload
+        containers = self._list_containers_sequential(
+            gvc, location, workload_name, options, stats
+        )
 
         # Apply filtering
         if options.filter_unhealthy:
@@ -1062,21 +1061,24 @@ class ContainerCollection(Collection):
     def count_containers(
         self,
         gvc: str,
+        workload_name: str,
         location: Optional[str] = None,
-        workload_name: Optional[str] = None,
         options: Optional[AdvancedListingOptions] = None,
     ) -> int:
         """
-        Count containers without returning the full list.
+        Count containers for a specific workload without returning the full list.
 
         Args:
             gvc: Name of the GVC
+            workload_name: Name of the specific workload
             location: Optional location filter
-            workload_name: Optional workload name filter
             options: Advanced listing options
 
         Returns:
-            Number of containers
+            Number of containers in the specified workload
+
+        Note:
+            This method follows the workload-centric design pattern.
         """
-        containers, _ = self.list_advanced(gvc, location, workload_name, options)
+        containers, _ = self.list_advanced(gvc, workload_name, location, options)
         return len(containers)

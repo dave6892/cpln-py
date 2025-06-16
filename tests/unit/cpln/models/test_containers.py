@@ -376,7 +376,7 @@ class TestContainerCollection(unittest.TestCase):
 
     @patch("cpln.models.containers.ContainerParser.parse_deployment_containers")
     def test_list_containers_single_workload(self, mock_parse: MagicMock) -> None:
-        """Test listing containers for a single workload"""
+        """Test listing containers for a single workload (workload-centric)"""
         # Mock API responses
         self.client.api.get_workload.return_value = {"name": self.workload_name}
         self.client.api.get_workload_deployment.return_value = {
@@ -393,11 +393,11 @@ class TestContainerCollection(unittest.TestCase):
         )
         mock_parse.return_value = [mock_container]
 
-        # Call list method
+        # Call list method with required workload_name
         containers = self.collection.list(
             gvc=self.gvc_name,
-            location=self.location,
             workload_name=self.workload_name,
+            location=self.location,
         )
 
         # Verify results
@@ -409,47 +409,14 @@ class TestContainerCollection(unittest.TestCase):
         self.client.api.get_workload_deployment.assert_called()
         mock_parse.assert_called()
 
-    @patch("cpln.models.containers.ContainerParser.parse_deployment_containers")
-    def test_list_containers_all_workloads(self, mock_parse: MagicMock) -> None:
-        """Test listing containers for all workloads in GVC"""
-        # Mock API responses
-        self.client.api.get_workload.side_effect = [
-            # First call: list workloads
-            {"items": [{"name": "workload1"}, {"name": "workload2"}]},
-            # Second call: get workload1 details
-            {"name": "workload1"},
-            # Third call: get workload2 details
-            {"name": "workload2"},
-        ]
+    def test_list_containers_missing_workload_name(self) -> None:
+        """Test that list method requires workload_name (workload-centric)"""
+        # Call list method without workload_name should raise ValueError
+        with self.assertRaises(ValueError) as cm:
+            self.collection.list(gvc=self.gvc_name, location=self.location)
 
-        self.client.api.get_workload_deployment.return_value = {
-            "status": {"versions": []}
-        }
-
-        # Mock parser responses
-        mock_container1 = Container(
-            name="container1",
-            image="nginx:latest",
-            workload_name="workload1",
-            gvc_name=self.gvc_name,
-            location=self.location,
-        )
-        mock_container2 = Container(
-            name="container2",
-            image="nginx:latest",
-            workload_name="workload2",
-            gvc_name=self.gvc_name,
-            location=self.location,
-        )
-        mock_parse.side_effect = [[mock_container1], [mock_container2]]
-
-        # Call list method
-        containers = self.collection.list(gvc=self.gvc_name, location=self.location)
-
-        # Verify results
-        self.assertEqual(len(containers), 2)
-        self.assertEqual(containers[0], mock_container1)
-        self.assertEqual(containers[1], mock_container2)
+        self.assertIn("workload_name is required", str(cm.exception))
+        self.assertIn("workload-centric", str(cm.exception))
 
     def test_infer_workload_locations(self) -> None:
         """Test location inference from workload data"""
@@ -764,13 +731,10 @@ class TestAdvancedContainerListing(unittest.TestCase):
         self.options = AdvancedListingOptions()
 
     def test_list_advanced_default_options(self) -> None:
-        """Test list_advanced with default options"""
+        """Test list_advanced with default options (workload-centric)"""
 
         # Mock API responses
-        self.client.api.get_workload.side_effect = [
-            {"items": [{"name": "workload1"}]},
-            {"name": "workload1"},
-        ]
+        self.client.api.get_workload.return_value = {"name": "workload1"}
         self.client.api.get_workload_deployment.return_value = {
             "metadata": {"name": "test-deployment"},
             "status": {
@@ -784,7 +748,7 @@ class TestAdvancedContainerListing(unittest.TestCase):
         }
 
         containers, stats = self.collection.list_advanced(
-            gvc=self.gvc_name, location=self.location
+            gvc=self.gvc_name, workload_name="workload1", location=self.location
         )
 
         self.assertIsInstance(containers, list)
@@ -793,7 +757,7 @@ class TestAdvancedContainerListing(unittest.TestCase):
         self.assertIsNotNone(stats.duration_seconds)
 
     def test_list_advanced_with_cache_hit(self) -> None:
-        """Test list_advanced with cache hit"""
+        """Test list_advanced with cache hit (workload-centric)"""
         from cpln.models.containers import Container
 
         # Pre-populate cache
@@ -806,12 +770,15 @@ class TestAdvancedContainerListing(unittest.TestCase):
         )
 
         cache_key = self.collection._generate_cache_key(
-            self.gvc_name, self.location, None
+            self.gvc_name, self.location, "wl"
         )
         self.collection._cache.set(cache_key, [container], 300)
 
         containers, stats = self.collection.list_advanced(
-            gvc=self.gvc_name, location=self.location, options=self.options
+            gvc=self.gvc_name,
+            workload_name="wl",
+            location=self.location,
+            options=self.options,
         )
 
         self.assertEqual(len(containers), 1)
@@ -820,14 +787,19 @@ class TestAdvancedContainerListing(unittest.TestCase):
         self.assertEqual(stats.cache_misses, 0)
 
     def test_list_advanced_with_cache_miss(self) -> None:
-        """Test list_advanced with cache miss"""
+        """Test list_advanced with cache miss (workload-centric)"""
         # Mock API responses
-        self.client.api.get_workload.side_effect = [
-            {"items": []},  # No workloads
-        ]
+        self.client.api.get_workload.return_value = {"name": "workload1"}
+        self.client.api.get_workload_deployment.return_value = {
+            "metadata": {"name": "test-deployment"},
+            "status": {"versions": []},
+        }
 
         containers, stats = self.collection.list_advanced(
-            gvc=self.gvc_name, location=self.location, options=self.options
+            gvc=self.gvc_name,
+            workload_name="workload1",
+            location=self.location,
+            options=self.options,
         )
 
         self.assertEqual(len(containers), 0)
@@ -923,7 +895,7 @@ class TestAdvancedContainerListing(unittest.TestCase):
             mock_list.return_value = (mock_containers, MagicMock())
 
             count = self.collection.count_containers(
-                gvc=self.gvc_name, location=self.location
+                gvc=self.gvc_name, workload_name="wl", location=self.location
             )
 
             self.assertEqual(count, 3)
@@ -1041,7 +1013,7 @@ class TestAdvancedContainerListing(unittest.TestCase):
         }
 
         containers, stats = self.collection.list_advanced(
-            gvc=self.gvc_name, options=options
+            gvc=self.gvc_name, workload_name="wl1", options=options
         )
 
         # Verify callback was called
