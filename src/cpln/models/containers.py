@@ -11,6 +11,47 @@ from .resource import Collection
 
 
 @dataclass
+class Status:
+    """
+    Represents deployment status information parsed from Control Plane deployment status payloads.
+    """
+
+    # Basic deployment status
+    endpoint: Optional[str] = None
+    remote: Optional[str] = None
+    last_processed_version: Optional[int] = None
+    expected_deployment_version: Optional[int] = None
+    ready: bool = False
+    deploying: bool = False
+    message: Optional[str] = None
+
+    # Latest version information
+    latest_version_name: Optional[str] = None
+    latest_version_created: Optional[str] = None
+    latest_version_workload: Optional[int] = None
+    latest_version_gvc: Optional[int] = None
+    latest_version_ready: Optional[bool] = None
+    latest_version_message: Optional[str] = None
+    latest_version_zone: Optional[str] = None
+
+    # Job execution information
+    latest_job_workload_version: Optional[int] = None
+    latest_job_status: Optional[str] = None
+    latest_job_start_time: Optional[str] = None
+    latest_job_completion_time: Optional[str] = None
+    latest_job_name: Optional[str] = None
+    latest_job_replica: Optional[str] = None
+
+    # Job condition information
+    latest_job_condition_status: Optional[str] = None
+    latest_job_condition_type: Optional[str] = None
+    latest_job_condition_message: Optional[str] = None
+    latest_job_condition_reason: Optional[str] = None
+    latest_job_condition_last_detection_time: Optional[str] = None
+    latest_job_condition_last_transition_time: Optional[str] = None
+
+
+@dataclass
 class Container:
     """
     Represents a container extracted from Control Plane deployment data.
@@ -51,6 +92,9 @@ class Container:
     deployment_name: Optional[str] = None
     version: Optional[str] = None
 
+    # Status dataclass object
+    status_obj: Optional[Status] = None
+
     def __post_init__(self):
         """Initialize default values after dataclass creation."""
         if self.environment_variables is None:
@@ -69,6 +113,7 @@ class Container:
         location: str,
         deployment_name: Optional[str] = None,
         version_data: Optional[Dict[str, Any]] = None,
+        deployment_status: Optional[Dict[str, Any]] = None,
     ) -> "Container":
         """
         Create a Container instance from deployment payload data.
@@ -80,9 +125,10 @@ class Container:
             location: Deployment location
             deployment_name: Name of the deployment
             version_data: Optional version metadata
+            deployment_status: Optional deployment status data for parsing container status
 
         Returns:
-            Container instance
+            Container instance with parsed status information
         """
         # Extract basic container info
         name = container_data.get("name", "")
@@ -109,7 +155,8 @@ class Container:
         if version_data:
             version = version_data.get("version")
 
-        return cls(
+        # Create the container instance
+        container = cls(
             name=name,
             image=image,
             workload_name=workload_name,
@@ -122,6 +169,16 @@ class Container:
             ports=ports,
         )
 
+        # Parse and assign status information if deployment_status is provided
+        if deployment_status:
+            status_obj = cls._parse_status_from_deployment(deployment_status, name)
+            container.status_obj = status_obj
+
+            # Update container status from parsed data
+            container.update_status_from_deployment(deployment_status)
+
+        return container
+
     @classmethod
     def from_job_payload(
         cls,
@@ -130,6 +187,7 @@ class Container:
         gvc_name: str,
         location: str,
         job_data: Optional[Dict[str, Any]] = None,
+        job_status: Optional[Dict[str, Any]] = None,
     ) -> "Container":
         """
         Create a Container instance from job execution payload data.
@@ -140,9 +198,10 @@ class Container:
             gvc_name: Name of the parent GVC
             location: Deployment location
             job_data: Optional job metadata
+            job_status: Optional job status data for parsing container status
 
         Returns:
-            Container instance
+            Container instance with parsed status information
         """
         # Job containers are similar to deployment containers
         # but may have different structure
@@ -153,7 +212,72 @@ class Container:
             location=location,
             deployment_name=job_data.get("name") if job_data else None,
             version_data=job_data,
+            deployment_status=job_status,
         )
+
+    @staticmethod
+    def _parse_status_from_deployment(
+        deployment_status: Dict[str, Any],
+        container_name: str,
+    ) -> Status:
+        """
+        Parse Status dataclass from deployment status data.
+
+        Args:
+            deployment_status: Deployment status data from the API
+            container_name: Name of the container to parse status for
+
+        Returns:
+            Status dataclass instance with parsed deployment status information
+        """
+        # Parse general deployment status
+        status_info = StatusParser.parse_deployment_status(deployment_status)
+
+        # Parse container-specific status from versions if available
+        versions = deployment_status.get("versions", [])
+        _ = StatusParser.parse_container_status_from_versions(versions, container_name)
+
+        # Create and populate Status dataclass
+        status = Status(
+            # Basic deployment status
+            endpoint=status_info.get("endpoint"),
+            remote=status_info.get("remote"),
+            last_processed_version=status_info.get("last_processed_version"),
+            expected_deployment_version=status_info.get("expected_deployment_version"),
+            ready=status_info.get("ready", False),
+            deploying=status_info.get("deploying", False),
+            message=status_info.get("message"),
+            # Latest version information
+            latest_version_name=status_info.get("latest_version_name"),
+            latest_version_created=status_info.get("latest_version_created"),
+            latest_version_workload=status_info.get("latest_version_workload"),
+            latest_version_gvc=status_info.get("latest_version_gvc"),
+            latest_version_ready=status_info.get("latest_version_ready"),
+            latest_version_message=status_info.get("latest_version_message"),
+            latest_version_zone=status_info.get("latest_version_zone"),
+            # Job execution information
+            latest_job_workload_version=status_info.get("latest_job_workload_version"),
+            latest_job_status=status_info.get("latest_job_status"),
+            latest_job_start_time=status_info.get("latest_job_start_time"),
+            latest_job_completion_time=status_info.get("latest_job_completion_time"),
+            latest_job_name=status_info.get("latest_job_name"),
+            latest_job_replica=status_info.get("latest_job_replica"),
+            # Job condition information
+            latest_job_condition_status=status_info.get("latest_job_condition_status"),
+            latest_job_condition_type=status_info.get("latest_job_condition_type"),
+            latest_job_condition_message=status_info.get(
+                "latest_job_condition_message"
+            ),
+            latest_job_condition_reason=status_info.get("latest_job_condition_reason"),
+            latest_job_condition_last_detection_time=status_info.get(
+                "latest_job_condition_last_detection_time"
+            ),
+            latest_job_condition_last_transition_time=status_info.get(
+                "latest_job_condition_last_transition_time"
+            ),
+        )
+
+        return status
 
     def update_status(
         self,
@@ -194,6 +318,121 @@ class Container:
 
         # Update timestamp
         self.updated_at = datetime.now()
+
+    def update_status_from_deployment(
+        self,
+        deployment_status: Dict[str, Any],
+        client=None,
+    ) -> None:
+        """
+        Update container status from Control Plane deployment status data.
+
+        This method uses the StatusParser, HealthEvaluator, and MetricsExtractor
+        to populate status information from real-time deployment data.
+
+        Args:
+            deployment_status: Deployment status data from the API
+            client: Optional client for additional API calls
+        """
+        # Parse deployment status information
+        status_info = StatusParser.parse_deployment_status(deployment_status)
+
+        # Parse container-specific status from versions
+        versions = deployment_status.get("versions", [])
+        container_status = StatusParser.parse_container_status_from_versions(
+            versions, self.name
+        )
+
+        # Evaluate health status
+        health_summary = HealthEvaluator.get_health_summary(
+            status_info, container_status
+        )
+
+        # Extract resource metrics
+        resource_metrics = MetricsExtractor.extract_resource_metrics(
+            status_info, container_status
+        )
+        replica_metrics = MetricsExtractor.calculate_replica_metrics(status_info)
+
+        # Update container status fields
+        self.health_status = health_summary["health_status"]
+
+        # Update status based on deployment readiness
+        if status_info.get("ready"):
+            self.status = "running"
+        elif status_info.get("deploying"):
+            self.status = "deploying"
+        else:
+            self.status = "pending"
+
+        # Update replica information
+        if replica_metrics["ready_replicas"] is not None:
+            self.ready_replicas = replica_metrics["ready_replicas"]
+        if replica_metrics["total_replicas"] is not None:
+            self.total_replicas = replica_metrics["total_replicas"]
+        if replica_metrics["restart_count"] is not None:
+            self.restart_count = replica_metrics["restart_count"]
+
+        # Update resource utilization
+        if resource_metrics["cpu_usage"] is not None:
+            self.cpu_usage = resource_metrics["cpu_usage"]
+        if resource_metrics["memory_usage"] is not None:
+            self.memory_usage = resource_metrics["memory_usage"]
+
+        # Update timestamp
+        self.updated_at = datetime.now()
+
+    def refresh_status(self, client) -> bool:
+        """
+        Refresh container status from the Control Plane API.
+
+        Args:
+            client: Control Plane client instance
+
+        Returns:
+            True if status was successfully refreshed, False otherwise
+        """
+        try:
+            from ..config import WorkloadConfig
+
+            # Create workload config for API call
+            workload_config = WorkloadConfig(
+                gvc=self.gvc_name,
+                workload_id=self.workload_name,
+                location=self.location,
+            )
+
+            # Get current deployment data
+            deployment_data = client.api.get_workload_deployment(workload_config)
+
+            # Extract deployment status
+            deployment_status = deployment_data.get("status", {})
+
+            # Update status from deployment data
+            self.update_status_from_deployment(deployment_status, client)
+
+            return True
+
+        except Exception:
+            # Silently fail for status refresh to avoid breaking existing functionality
+            return False
+
+    def get_health_summary(self) -> Dict[str, Any]:
+        """
+        Get a comprehensive health summary for this container.
+
+        Returns:
+            Dictionary containing health status and related information
+        """
+        return {
+            "health_status": self.health_status or "unknown",
+            "is_healthy": self.is_healthy(),
+            "status": self.status,
+            "ready_replicas": self.ready_replicas,
+            "total_replicas": self.total_replicas,
+            "restart_count": self.restart_count,
+            "last_updated": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
     def is_healthy(self) -> bool:
         """
@@ -254,6 +493,357 @@ class Container:
             "memory_usage": self.memory_usage,
             "deployment_name": self.deployment_name,
             "version": self.version,
+        }
+
+
+class StatusParser:
+    """
+    Utility class for parsing container status and health information from deployment status payloads.
+
+    This class extracts real-time status information from Control Plane's deployment_status schema
+    as defined in the OpenAPI specification.
+    """
+
+    @classmethod
+    def parse_deployment_status(
+        cls,
+        deployment_status: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Parse deployment status information from Control Plane deployment_status payload.
+
+        Args:
+            deployment_status: Deployment status data from the API
+
+        Returns:
+            Dictionary containing parsed status information
+        """
+        # Validate and extract basic status information with type checking
+        ready_raw = deployment_status.get("ready", False)
+        deploying_raw = deployment_status.get("deploying", False)
+
+        status_info = {
+            "endpoint": deployment_status.get("endpoint"),
+            "remote": deployment_status.get("remote"),
+            "last_processed_version": deployment_status.get("lastProcessedVersion"),
+            "expected_deployment_version": deployment_status.get(
+                "expectedDeploymentVersion"
+            ),
+            "ready": ready_raw if isinstance(ready_raw, bool) else False,
+            "deploying": deploying_raw if isinstance(deploying_raw, bool) else False,
+            "message": deployment_status.get("message"),
+        }
+
+        # Parse version information
+        versions = deployment_status.get("versions", [])
+        if versions and isinstance(versions, list):
+            # Find the latest valid version (dict) from the end of the list
+            latest_version = None
+            for version in reversed(versions):
+                if isinstance(version, dict):
+                    latest_version = version
+                    break
+
+            if latest_version:
+                status_info.update(
+                    {
+                        "latest_version_name": latest_version.get("name"),
+                        "latest_version_created": latest_version.get("created"),
+                        "latest_version_workload": latest_version.get("workload"),
+                        "latest_version_gvc": latest_version.get("gvc"),
+                        "latest_version_ready": latest_version.get("ready"),
+                        "latest_version_message": latest_version.get("message"),
+                        "latest_version_zone": latest_version.get("zone"),
+                    }
+                )
+            else:
+                # Set default None values when no valid version dict found
+                status_info.update(
+                    {
+                        "latest_version_name": None,
+                        "latest_version_created": None,
+                        "latest_version_workload": None,
+                        "latest_version_gvc": None,
+                        "latest_version_ready": None,
+                        "latest_version_message": None,
+                        "latest_version_zone": None,
+                    }
+                )
+        else:
+            # Set default None values when versions is not valid
+            status_info.update(
+                {
+                    "latest_version_name": None,
+                    "latest_version_created": None,
+                    "latest_version_workload": None,
+                    "latest_version_gvc": None,
+                    "latest_version_ready": None,
+                    "latest_version_message": None,
+                    "latest_version_zone": None,
+                }
+            )
+
+        # Parse job execution information
+        job_executions = deployment_status.get("jobExecutions", [])
+        if job_executions:
+            latest_job = job_executions[-1]  # Most recent job execution
+            status_info.update(
+                {
+                    "latest_job_workload_version": latest_job.get("workloadVersion"),
+                    "latest_job_status": latest_job.get("status"),
+                    "latest_job_start_time": latest_job.get("startTime"),
+                    "latest_job_completion_time": latest_job.get("completionTime"),
+                    "latest_job_name": latest_job.get("name"),
+                    "latest_job_replica": latest_job.get("replica"),
+                }
+            )
+
+            # Parse job conditions for more detailed status
+            conditions = latest_job.get("conditions", [])
+            if conditions:
+                latest_condition = conditions[-1]
+                status_info.update(
+                    {
+                        "latest_job_condition_status": latest_condition.get("status"),
+                        "latest_job_condition_type": latest_condition.get("type"),
+                        "latest_job_condition_message": latest_condition.get("message"),
+                        "latest_job_condition_reason": latest_condition.get("reason"),
+                        "latest_job_condition_last_detection_time": latest_condition.get(
+                            "lastDetectionTime"
+                        ),
+                        "latest_job_condition_last_transition_time": latest_condition.get(
+                            "lastTransitionTime"
+                        ),
+                    }
+                )
+
+        return status_info
+
+    @classmethod
+    def parse_container_status_from_versions(
+        cls,
+        versions: List[Dict[str, Any]],
+        container_name: str,
+    ) -> Dict[str, Any]:
+        """
+        Parse container-specific status from deployment versions.
+
+        Args:
+            versions: List of version data from deployment status
+            container_name: Name of the container to extract status for
+
+        Returns:
+            Dictionary containing container-specific status information
+        """
+        container_status = {
+            "ready": False,
+            "total_replicas": 0,
+            "ready_replicas": 0,
+            "restart_count": 0,
+        }
+
+        for version in versions:
+            # Skip non-dict versions to handle malformed data gracefully
+            if not isinstance(version, dict):
+                continue
+
+            containers = version.get("containers", {})
+            if container_name in containers:
+                container_info = containers[container_name]
+
+                # Extract container-specific information
+                # Note: The actual structure may vary based on the deployment type
+                container_status.update(
+                    {
+                        "version_ready": version.get("ready", False),
+                        "version_name": version.get("name"),
+                        "version_zone": version.get("zone"),
+                        "version_message": version.get("message"),
+                    }
+                )
+
+                # Container-specific data (structure depends on deployment type)
+                if isinstance(container_info, dict):
+                    # Extract any additional container metadata if available
+                    container_status.update(
+                        {
+                            "container_data": container_info,
+                        }
+                    )
+
+                break
+
+        return container_status
+
+
+class HealthEvaluator:
+    """
+    Utility class for determining container health status from deployment and status information.
+    """
+
+    @classmethod
+    def evaluate_health_status(
+        cls,
+        status_info: Dict[str, Any],
+        container_status: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Evaluate the overall health status of a container based on deployment status information.
+
+        Args:
+            status_info: Parsed deployment status information
+            container_status: Container-specific status information
+
+        Returns:
+            Health status: "healthy", "degraded", "unhealthy", or "unknown"
+        """
+        # Check if deployment is ready
+        deployment_ready = status_info.get("ready", False)
+        deployment_deploying = status_info.get("deploying", False)
+
+        # Check latest version status
+        version_ready = status_info.get("latest_version_ready")
+
+        # Check job execution status if available
+        job_status = status_info.get("latest_job_status")
+
+        # Evaluate based on available information
+        if deployment_deploying:
+            # Currently deploying - status is transitional
+            return "degraded"
+
+        if deployment_ready and version_ready:
+            # Both deployment and version are ready
+            if job_status in ["successful", None]:  # No job or successful job
+                return "healthy"
+            elif job_status == "active":
+                return "degraded"  # Job is running
+            elif job_status in ["failed", "invalid", "removed"]:
+                return "unhealthy"
+            else:
+                return "unknown"
+
+        elif deployment_ready and version_ready is None:
+            # Deployment ready but no version info - likely healthy but uncertain
+            return "degraded" if job_status == "failed" else "healthy"
+
+        elif not deployment_ready:
+            # Deployment not ready
+            if version_ready is False:
+                return "unhealthy"
+            else:
+                return "degraded"
+
+        # Default to unknown if we can't determine status
+        return "unknown"
+
+    @classmethod
+    def get_health_summary(
+        cls,
+        status_info: Dict[str, Any],
+        container_status: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get a comprehensive health summary including status and reason.
+
+        Args:
+            status_info: Parsed deployment status information
+            container_status: Container-specific status information
+
+        Returns:
+            Dictionary containing health status and additional context
+        """
+        health_status = cls.evaluate_health_status(status_info, container_status)
+
+        summary = {
+            "health_status": health_status,
+            "deployment_ready": status_info.get("ready", False),
+            "deployment_deploying": status_info.get("deploying", False),
+            "version_ready": status_info.get("latest_version_ready"),
+            "job_status": status_info.get("latest_job_status"),
+            "status_message": status_info.get("message")
+            or status_info.get("latest_version_message"),
+        }
+
+        # Add reason for the health status
+        if health_status == "healthy":
+            summary["reason"] = "Deployment and version are ready"
+        elif health_status == "degraded":
+            if status_info.get("deploying"):
+                summary["reason"] = "Deployment in progress"
+            elif status_info.get("latest_job_status") == "active":
+                summary["reason"] = "Job execution in progress"
+            else:
+                summary["reason"] = "Partially ready or transitional state"
+        elif health_status == "unhealthy":
+            if status_info.get("latest_job_status") in ["failed", "invalid", "removed"]:
+                summary[
+                    "reason"
+                ] = f"Job execution {status_info.get('latest_job_status')}"
+            else:
+                summary["reason"] = "Deployment or version not ready"
+        else:
+            summary["reason"] = "Insufficient information to determine health"
+
+        return summary
+
+
+class MetricsExtractor:
+    """
+    Utility class for extracting resource utilization metrics from deployment status information.
+    """
+
+    @classmethod
+    def extract_resource_metrics(
+        cls,
+        status_info: Dict[str, Any],
+        container_status: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Optional[float]]:
+        """
+        Extract CPU and memory utilization metrics from status information.
+
+        Args:
+            status_info: Parsed deployment status information
+            container_status: Container-specific status information
+
+        Returns:
+            Dictionary containing CPU and memory utilization percentages
+        """
+        metrics = {
+            "cpu_usage": None,
+            "memory_usage": None,
+        }
+
+        # Note: The current deployment_status schema doesn't include detailed resource metrics
+        # This is a placeholder for future enhancement when metrics endpoints are integrated
+        # or when the deployment status includes resource utilization data
+
+        # For now, we can infer basic resource health based on status
+        # In the future, this could integrate with metrics APIs or enhanced status data
+
+        return metrics
+
+    @classmethod
+    def calculate_replica_metrics(
+        cls,
+        status_info: Dict[str, Any],
+    ) -> Dict[str, Optional[int]]:
+        """
+        Calculate replica-related metrics from deployment status.
+
+        Args:
+            status_info: Parsed deployment status information
+
+        Returns:
+            Dictionary containing replica counts and ratios
+        """
+        # Extract replica information from versions if available
+        # This is a basic implementation - the actual data structure may vary
+
+        return {
+            "total_replicas": None,  # Not directly available in current schema
+            "ready_replicas": None,  # Not directly available in current schema
+            "restart_count": None,  # Not directly available in current schema
         }
 
 
@@ -325,6 +915,7 @@ class ContainerParser:
                         location=location,
                         deployment_name=deployment_data.get("metadata", {}).get("name"),
                         version_data=version_data,
+                        deployment_status=deployment_data.get("status", {}),
                     )
 
                     containers.append(container)
@@ -889,9 +1480,8 @@ class ContainerCollection(Collection):
 
             # Collect results as they complete
             completed = 0
-            for future in as_completed(future_to_workload):
+            for completed, future in enumerate(as_completed(future_to_workload), 1):
                 workload_name = future_to_workload[future]
-                completed += 1
 
                 # Call progress callback if provided
                 if options.progress_callback:
@@ -1087,3 +1677,99 @@ class ContainerCollection(Collection):
         """
         containers, _ = self.list_advanced(gvc, workload_name, location, options)
         return len(containers)
+
+    def refresh_all_status(
+        self,
+        containers: List[Container],
+        options: Optional[AdvancedListingOptions] = None,
+    ) -> Tuple[int, int]:
+        """
+        Refresh status for all containers in the provided list.
+
+        Args:
+            containers: List of containers to refresh status for
+            options: Advanced listing options for parallel processing
+
+        Returns:
+            Tuple of (successful_refreshes, failed_refreshes)
+        """
+        if options is None:
+            options = AdvancedListingOptions()
+
+        successful = 0
+        failed = 0
+
+        if options.enable_parallel and len(containers) > 1:
+            # Use parallel processing for better performance
+            with ThreadPoolExecutor(max_workers=options.max_workers) as executor:
+                future_to_container = {
+                    executor.submit(container.refresh_status, self.client): container
+                    for container in containers
+                }
+
+                for future in as_completed(future_to_container):
+                    try:
+                        result = future.result()
+                        if result:
+                            successful += 1
+                        else:
+                            failed += 1
+                    except Exception:
+                        failed += 1
+        else:
+            # Sequential processing
+            for i, container in enumerate(containers):
+                # Call progress callback if provided
+                if options.progress_callback:
+                    options.progress_callback(
+                        "Refreshing container status", i + 1, len(containers)
+                    )
+
+                try:
+                    result = container.refresh_status(self.client)
+                    if result:
+                        successful += 1
+                    else:
+                        failed += 1
+                except Exception:
+                    failed += 1
+
+        return successful, failed
+
+    def get_containers_with_status(
+        self,
+        gvc: str,
+        workload_name: str,
+        location: Optional[str] = None,
+        refresh_status: bool = True,
+        options: Optional[AdvancedListingOptions] = None,
+    ) -> Tuple[List[Container], ContainerListingStatistics]:
+        """
+        Get containers for a workload with real-time status information.
+
+        This is a convenience method that combines container listing with status refresh.
+
+        Args:
+            gvc: Name of the GVC
+            workload_name: Name of the specific workload
+            location: Optional location filter
+            refresh_status: Whether to refresh status from API
+            options: Advanced listing options
+
+        Returns:
+            Tuple of (containers list with refreshed status, statistics)
+        """
+        # Get containers using advanced listing
+        containers, stats = self.list_advanced(gvc, workload_name, location, options)
+
+        # Refresh status if requested
+        if refresh_status and containers:
+            successful, failed = self.refresh_all_status(containers, options)
+
+            # Update statistics with status refresh info
+            if stats:
+                stats.api_calls_made += len(
+                    containers
+                )  # Estimate API calls for status refresh
+
+        return containers, stats

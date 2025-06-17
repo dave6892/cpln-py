@@ -245,6 +245,97 @@ def show_container_health_summary(containers: List[Container]) -> None:
                 print(f"  - {container.workload_name}/{container.name} ({status})")
 
 
+def demonstrate_status_parser_robustness() -> None:
+    """
+    Demonstrate the StatusParser's robustness when handling edge cases and unexpected data types.
+
+    This showcases the defensive programming features that were added to handle
+    malformed or unexpected API responses gracefully.
+    """
+    from cpln.models.containers import HealthEvaluator, StatusParser
+
+    print("\n=== StatusParser Robustness Demonstration ===")
+    print("This demonstrates how the StatusParser handles edge cases gracefully.")
+
+    # Test Case 1: Normal well-formed data
+    print("\n1. 📝 Normal deployment status:")
+    normal_data = {
+        "ready": True,
+        "deploying": False,
+        "endpoint": "https://example.cpln.io",
+        "versions": [
+            {
+                "name": "v1.2.3",
+                "ready": True,
+                "workload": "example-workload",
+                "gvc": "example-gvc",
+            }
+        ],
+    }
+
+    parsed = StatusParser.parse_deployment_status(normal_data)
+    health = HealthEvaluator.get_health_summary(parsed)
+    print(f"   ✅ Ready: {parsed['ready']}, Version: {parsed['latest_version_name']}")
+    print(f"   ✅ Health: {health['health_status']} - {health['reason']}")
+
+    # Test Case 2: Edge case with unexpected data types
+    print("\n2. 🔧 Edge case - unexpected data types:")
+    edge_case_data = {
+        "ready": "not_a_boolean",  # String instead of boolean
+        "deploying": 1,  # Integer instead of boolean
+        "versions": "not_a_list",  # String instead of list
+    }
+
+    print(
+        f"   📥 Input: ready={edge_case_data['ready']!r} (type: {type(edge_case_data['ready']).__name__})"
+    )
+    print(
+        f"   📥 Input: versions={edge_case_data['versions']!r} (type: {type(edge_case_data['versions']).__name__})"
+    )
+
+    parsed = StatusParser.parse_deployment_status(edge_case_data)
+    health = HealthEvaluator.get_health_summary(parsed)
+    print(
+        f"   ✅ Parsed ready: {parsed['ready']} (type: {type(parsed['ready']).__name__})"
+    )
+    print(f"   ✅ Latest version: {parsed['latest_version_name']} (graceful fallback)")
+    print(f"   ✅ Health: {health['health_status']} - {health['reason']}")
+
+    # Test Case 3: Mixed valid/invalid version data
+    print("\n3. 🔀 Mixed valid/invalid version data:")
+    mixed_data = {
+        "ready": True,
+        "versions": [
+            "invalid_string",  # Invalid
+            {"name": "v1.0.0", "ready": True},  # Valid
+            None,  # Invalid
+            {"incomplete": "data"},  # Valid dict but missing expected fields
+        ],
+    }
+
+    parsed = StatusParser.parse_deployment_status(mixed_data)
+    print(f"   ✅ Found latest valid version: {parsed['latest_version_name']}")
+    print(f"   ✅ Version ready: {parsed['latest_version_ready']}")
+    print(f"   🛡️  Parser handled {len(mixed_data['versions'])} mixed items gracefully")
+
+    # Test Case 4: Empty/minimal data
+    print("\n4. 📭 Empty deployment status:")
+    empty_data = {}
+
+    parsed = StatusParser.parse_deployment_status(empty_data)
+    health = HealthEvaluator.get_health_summary(parsed)
+    print(f"   ✅ Ready (default): {parsed['ready']}")
+    print(f"   ✅ Latest version (default): {parsed['latest_version_name']}")
+    print(f"   ✅ Health: {health['health_status']} - {health['reason']}")
+
+    print("\n🛡️  Key Benefits of Robust Parsing:")
+    print("   • Prevents application crashes from unexpected API responses")
+    print("   • Provides consistent data structure regardless of input quality")
+    print("   • Allows graceful degradation when API data is malformed")
+    print("   • Maintains backward compatibility as API schemas evolve")
+    print("   • Improves production system reliability and uptime")
+
+
 def list_containers_across_workloads(
     client: cpln.CPLNClient, gvc_name: str
 ) -> List[Container]:
@@ -376,6 +467,10 @@ def main():
     # Example 5: Show health summary (if any containers were found)
     if all_containers:
         show_container_health_summary(all_containers)
+
+    # Example 6: Demonstrate StatusParser robustness
+    print("\n6. StatusParser robustness demonstration:")
+    demonstrate_status_parser_robustness()
 
     print("\n=== Workload-Centric Design Principles ===")
     print("✅ Always access containers through their parent workload")
