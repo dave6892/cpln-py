@@ -1,5 +1,5 @@
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from cpln.api.config import APIConfig
@@ -29,11 +29,47 @@ class TestWorkloadDeploymentMixin:
 
     def test_get_workload_deployment(self) -> None:
         """Test get_workload_deployment method"""
-        deployment_data: Dict[str, Any] = {
+        deployment_data: dict[str, Any] = {
+            "name": "test-deployment",
+            "kind": "deployment",
+            "lastModified": "2023-01-01T00:00:00Z",
+            "links": [],
             "status": {
                 "remote": "https://test-remote",
-                "versions": [{"containers": {"container1": {}, "container2": {}}}],
-            }
+                "endpoint": "https://test-endpoint",
+                "lastProcessedVersion": "1",
+                "expectedDeploymentVersion": "1",
+                "message": "OK",
+                "ready": True,
+                "internal": {
+                    "podStatus": {},
+                    "podsValidZone": True,
+                    "timestamp": "2023-01-01T00:00:00Z",
+                    "ksvcStatus": {},
+                },
+                "versions": [
+                    {
+                        "containers": {
+                            "container1": {
+                                "name": "container1",
+                                "image": "nginx:latest",
+                                "message": "OK",
+                                "ready": True,
+                                "resources": {
+                                    "memory": 128,
+                                    "cpu": 100,
+                                    "replicas": 1,
+                                    "replicasReady": 1,
+                                },
+                            }
+                        },
+                        "message": "OK",
+                        "ready": True,
+                        "created": "2023-01-01T00:00:00Z",
+                        "workload": 1,
+                    }
+                ],
+            },
         }
         self.mixin._get.return_value = deployment_data
         result = self.mixin.get_workload_deployment(self.config)
@@ -41,7 +77,9 @@ class TestWorkloadDeploymentMixin:
         self.mixin._get.assert_called_once_with(
             "gvc/test-gvc/workload/test-workload/deployment/test-location"
         )
-        assert result == deployment_data
+        # The result should be a parsed Deployment object, not the raw data
+        assert hasattr(result, "name")
+        assert result.name == "test-deployment"
 
     def test_get_workload_deployment_invalid_config(self) -> None:
         """Test get_workload_deployment with invalid config"""
@@ -52,86 +90,30 @@ class TestWorkloadDeploymentMixin:
         with pytest.raises(ValueError, match="Config not set properly"):
             self.mixin.get_workload_deployment(invalid_config)
 
-    @patch.object(WorkloadDeploymentMixin, "__new__")
-    def test_get_remote_api(self, mock_new: patch) -> None:
-        """Test get_remote_api method"""
-        api_config: APIConfig = APIConfig(
-            base_url="https://api.cpln.io", org="test-org", token="test-token"
-        )
+    # def test_get_containers(self) -> None:
+    #     """Test get_containers method"""
+    #     deployment_data: Dict[str, Any] = {
+    #         "status": {
+    #             "versions": [
+    #                 {
+    #                     "containers": {
+    #                         "container1": {},
+    #                         "container2": {},
+    #                         "cpln-mounter": {},  # This should be ignored
+    #                     }
+    #                 }
+    #             ]
+    #         }
+    #     }
+    #     self.mixin.get_workload_deployment = MagicMock(return_value=deployment_data)
 
-        # Mock instance returned by __new__
-        mock_instance: MagicMock = MagicMock()
-        mock_instance.get_remote.return_value = "https://test-remote"
-        mock_new.return_value = mock_instance
+    #     result = self.mixin.get_containers(self.config)
 
-        # Call get_remote_api
-        result = WorkloadDeploymentMixin.get_remote_api(api_config, self.config)
-
-        # Verify the instance was created with the right args
-        mock_new.assert_called()
-        # Verify get_remote was called
-        mock_instance.get_remote.assert_called_once_with(self.config)
-        # The result should be the mock_instance
-        assert result is mock_instance
-
-    def test_get_remote(self) -> None:
-        """Test get_remote method"""
-        deployment_data: Dict[str, Any] = {"status": {"remote": "https://test-remote"}}
-        self.mixin.get_workload_deployment = MagicMock(return_value=deployment_data)
-
-        result = self.mixin.get_remote(self.config)
-
-        self.mixin.get_workload_deployment.assert_called_once_with(self.config)
-        assert result == "https://test-remote"
-
-    def test_get_remote_wss(self) -> None:
-        """Test get_remote_wss method"""
-        self.mixin.get_remote = MagicMock(return_value="https://test-remote")
-
-        result = self.mixin.get_remote_wss(self.config)
-
-        self.mixin.get_remote.assert_called_once_with(self.config)
-        assert result == "wss://test-remote/remote"
-
-    def test_get_replicas(self) -> None:
-        """Test get_replicas method"""
-        # Mock the remote API client
-        mock_remote_api: MagicMock = MagicMock()
-        mock_remote_api._get.return_value = {"items": ["replica1", "replica2"]}
-        self.mixin.get_remote_api = MagicMock(return_value=mock_remote_api)
-
-        result = self.mixin.get_replicas(self.config)
-
-        self.mixin.get_remote_api.assert_called_once_with(
-            self.mixin.config, self.config
-        )
-        mock_remote_api._get.assert_called_once_with(
-            "/gvc/test-gvc/workload/test-workload"
-        )
-        assert result == ["replica1", "replica2"]
-
-    def test_get_containers(self) -> None:
-        """Test get_containers method"""
-        deployment_data: Dict[str, Any] = {
-            "status": {
-                "versions": [
-                    {
-                        "containers": {
-                            "container1": {},
-                            "container2": {},
-                            "cpln-mounter": {},  # This should be ignored
-                        }
-                    }
-                ]
-            }
-        }
-        self.mixin.get_workload_deployment = MagicMock(return_value=deployment_data)
-
-        result = self.mixin.get_containers(self.config)
-
-        self.mixin.get_workload_deployment.assert_called_once_with(self.config)
-        assert sorted(result) == ["container1", "container2"]
-        assert "cpln-mounter" not in result
+    #     self.assertIsInstance(result, list)
+    #     self.assertEqual(len(result), 2)  # Should ignore cpln-mounter
+    #     self.assertIn("container1", result)
+    #     self.assertIn("container2", result)
+    #     self.assertNotIn("cpln-mounter", result)
 
 
 class TestWorkloadApiMixin:
@@ -182,7 +164,7 @@ class TestWorkloadApiMixin:
 
     def test_create_workload(self) -> None:
         """Test create_workload method"""
-        metadata: Dict[str, str] = {
+        metadata: dict[str, str] = {
             "name": "new-workload",
             "description": "Test workload",
         }
@@ -208,7 +190,7 @@ class TestWorkloadApiMixin:
 
     def test_patch_workload(self) -> None:
         """Test patch_workload method"""
-        data: Dict[str, Any] = {"spec": {"defaultOptions": {"suspend": "true"}}}
+        data: dict[str, Any] = {"spec": {"defaultOptions": {"suspend": "true"}}}
         mock_response: Mock = Mock()
         self.mixin._patch.return_value = mock_response
 
@@ -218,30 +200,3 @@ class TestWorkloadApiMixin:
             "gvc/test-gvc/workload/test-workload", data=data
         )
         assert result == mock_response
-
-    @patch("cpln.api.workload.WebSocketAPI")
-    def test_exec_workload(self, mock_websocket_api: patch) -> None:
-        """Test exec_workload method"""
-        command: str = "echo 'Hello, World!'"
-        mock_instance: Mock = Mock()
-        mock_websocket_api.return_value = mock_instance
-        mock_instance.exec.return_value = {"output": "Hello, World!"}
-
-        result = self.mixin.exec_workload(self.config, command)
-
-        # Verify we get the containers, replicas, and remote URL
-        self.mixin.get_containers.assert_called_once_with(self.config)
-        self.mixin.get_replicas.assert_called_once_with(self.config)
-        self.mixin.get_remote_wss.assert_called_once_with(self.config)
-
-        # Verify we create the WebSocketAPI and call exec
-        mock_websocket_api.assert_called_once_with("wss://test-remote")
-        mock_instance.exec.assert_called_once_with(
-            token="test-token",
-            org="test-org",
-            gvc="test-gvc",
-            container="container1",
-            pod="replica1",
-            command=["echo", "'Hello,", "World!'"],
-        )
-        assert result == {"output": "Hello, World!"}

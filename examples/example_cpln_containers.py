@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 """
-Example: Container Operations with Control Plane API
+Example: Workload Container Operations with Control Plane API
 
-This example demonstrates how to list and inspect containers
-across workloads in a Control Plane GVC.
+This example demonstrates how to inspect workload containers and deployments
+using the new parser-based architecture with deployment objects.
 
-Note: Container operations are read-only since the Control Plane API
-does not expose direct container management endpoints.
+Key features:
+- Workload container specifications
+- Live deployment status and containers
+- Replica management
+- Container execution commands
+
+Usage:
+    python examples/example_cpln_containers.py [gvc-name] [workload-name]
 """
 
 import os
 import sys
-from typing import List
 
 # Add the src directory to the path to import cpln
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # ruff: noqa: E402
 import cpln
-from cpln.models.containers import Container
+from cpln.config import WorkloadConfig
 
 
-def list_containers_for_workload(
+def list_workload_containers(
     client: cpln.CPLNClient, gvc_name: str, workload_name: str
-) -> List[Container]:
+):
     """
-    List containers for a specific workload (workload-centric approach).
+    List container specifications for a specific workload.
 
     Args:
         client: CPLN client instance
@@ -33,331 +38,114 @@ def list_containers_for_workload(
         workload_name: Name of the specific workload
 
     Returns:
-        List of Container instances for the workload
+        List of container specifications for the workload
     """
-    print(
-        f"\n=== Listing containers for workload: {workload_name} (Workload-Centric) ==="
-    )
+    print(f"\n=== Listing container specs for workload: {workload_name} ===")
 
     try:
-        # Get the specific workload
-        from cpln.config import WorkloadConfig
-
+        # Create config and get the workload
         config = WorkloadConfig(gvc=gvc_name, workload_id=workload_name)
         workload = client.workloads.get(config)
 
-        # Get containers for this specific workload
-        containers = workload.get_container_objects()
+        # Get container specifications from the workload spec
+        containers = workload.get_containers()
 
         if containers:
             print(
-                f"\n📦 Workload: {workload.attrs['name']} ({len(containers)} containers)"
+                f"\n📦 Workload: {workload.attrs['name']} ({len(containers)} container specs)"
             )
 
             for container in containers:
                 print(f"  ├─ Container: {container.name}")
                 print(f"  │  Image: {container.image}")
-                print(f"  │  Location: {container.location}")
-                print(f"  │  Status: {container.status or 'Unknown'}")
-                print(f"  │  Health: {container.health_status or 'Unknown'}")
+                print(f"  │  CPU: {container.cpu}")
+                print(f"  │  Memory: {container.memory}")
 
-                # Show environment variables if any
-                if container.environment_variables:
-                    print(
-                        f"  │  Environment variables: {len(container.environment_variables)}"
-                    )
-                    for name, value in list(container.environment_variables.items())[
-                        :3
-                    ]:
-                        print(f"  │    {name}={value}")
-                    if len(container.environment_variables) > 3:
-                        print(
-                            f"  │    ... and {len(container.environment_variables) - 3} more"
-                        )
+                # Show ports if any
+                if container.ports:
+                    print(f"  │  Ports: {len(container.ports)}")
+                    for port in container.ports:
+                        print(f"  │    {port.number}/{port.protocol}")
 
-                # Show resource limits if any
-                if container.resource_limits:
-                    print("  │  Resource limits:")
-                    if container.resource_limits.get("cpu"):
-                        print(f"  │    CPU: {container.resource_limits['cpu']}")
-                    if container.resource_limits.get("memory"):
-                        print(f"  │    Memory: {container.resource_limits['memory']}")
-
-                # Show health status
-                health_emoji = "✅" if container.is_healthy() else "❌"
-                print(f"  │  Healthy: {health_emoji} {container.is_healthy()}")
+                print(f"  │  Inherit Env: {container.inherit_env}")
                 print("  │")
 
             print(
-                f"\n📊 Total containers in workload {workload_name}: {len(containers)}"
+                f"\n📊 Total container specs in workload {workload_name}: {len(containers)}"
             )
         else:
-            print(f"No containers found in workload {workload_name}.")
+            print(f"No container specs found in workload {workload_name}.")
 
         return containers
 
-    except cpln.errors.APIError as e:
+    except Exception as e:
         print(f"Error listing containers for workload {workload_name}: {e}")
         return []
 
 
-def list_containers_with_location_filter(
+def demonstrate_container_execution(
     client: cpln.CPLNClient, gvc_name: str, workload_name: str, location: str
-) -> List[Container]:
+):
     """
-    Container listing with location filter for a specific workload (workload-centric approach).
-
-    Args:
-        client: CPLN client instance
-        gvc_name: Name of the GVC
-        workload_name: Name of the specific workload
-        location: Location to filter by
-
-    Returns:
-        List of Container instances for the workload in the specified location
-    """
-    print(
-        f"\n=== Listing containers for workload: {workload_name}, Location: {location} ==="
-    )
-
-    try:
-        # Get the specific workload
-        from cpln.config import WorkloadConfig
-
-        config = WorkloadConfig(gvc=gvc_name, workload_id=workload_name)
-        workload = client.workloads.get(config)
-
-        # Get containers for this workload with location filter
-        containers = workload.get_container_objects(location=location)
-
-        if containers:
-            print(
-                f"\n📦 Workload: {workload.attrs['name']} ({len(containers)} containers in {location})"
-            )
-
-            for container in containers:
-                print(f"  ├─ {container.name} ({container.image})")
-
-                # Show replica information if available
-                if (
-                    container.ready_replicas is not None
-                    and container.total_replicas is not None
-                ):
-                    print(
-                        f"     Replicas: {container.ready_replicas}/{container.total_replicas}"
-                    )
-
-                # Show resource utilization if available
-                utilization = container.get_resource_utilization()
-                if any(utilization.values()):
-                    print("     Resource usage:")
-                    if utilization["cpu"]:
-                        print(f"       CPU: {utilization['cpu']:.1f}%")
-                    if utilization["memory"]:
-                        print(f"       Memory: {utilization['memory']:.1f}%")
-
-            print(
-                f"\n📊 Total containers in {workload_name} at {location}: {len(containers)}"
-            )
-        else:
-            print(
-                f"No containers found for workload {workload_name} in location '{location}'."
-            )
-
-        return containers
-
-    except cpln.errors.APIError as e:
-        print(f"Error listing containers for workload {workload_name}: {e}")
-        return []
-
-
-def list_containers_by_workload(
-    client: cpln.CPLNClient, gvc_name: str, workload_name: str
-) -> List[Container]:
-    """
-    List containers for a specific workload.
+    Demonstrate container execution capabilities.
 
     Args:
         client: CPLN client instance
         gvc_name: Name of the GVC
         workload_name: Name of the workload
-
-    Returns:
-        List of Container instances
+        location: Location to execute in
     """
-    print(f"\n=== Listing containers for workload: {workload_name} ===")
+    print(f"\n=== Container Execution Demo: {workload_name} ===")
 
     try:
-        containers = client.containers.list(gvc=gvc_name, workload_name=workload_name)
+        # Create config and get the workload
+        config = WorkloadConfig(
+            gvc=gvc_name, workload_id=workload_name, location=location
+        )
+        workload = client.workloads.get(config)
 
-        if not containers:
-            print(f"No containers found for workload '{workload_name}'.")
-            return []
+        # Try to ping the workload
+        print("\n🏓 Pinging workload...")
+        ping_result = workload.ping(location=location)
 
-        print(f"Found {len(containers)} container(s) in workload {workload_name}:")
+        print(f"   Status: {ping_result['status']}")
+        print(f"   Message: {ping_result['message']}")
+        print(f"   Exit Code: {ping_result['exit_code']}")
 
-        for container in containers:
-            print(f"\n  Container: {container.name}")
-            print(f"    Image: {container.image}")
-            print(f"    Location: {container.location}")
-            print(f"    Deployment: {container.deployment_name or 'Unknown'}")
+        # Get available containers
+        containers = workload.get_containers()
+        if containers:
+            container_name = containers[0].name
+            print(f"\n💻 Executing command in container: {container_name}")
 
-            # Convert to dict for detailed view
-            container_dict = container.to_dict()
+            try:
+                # Execute a simple command
+                result = workload.exec(
+                    "echo 'Hello from container!'",
+                    location=location,
+                    container=container_name,
+                )
+                print(f"   Command executed successfully: {result}")
 
-            # Show timestamps if available
-            if container_dict.get("created_at"):
-                print(f"    Created: {container_dict['created_at']}")
-            if container_dict.get("updated_at"):
-                print(f"    Updated: {container_dict['updated_at']}")
+            except Exception as e:
+                print(f"   Execution failed: {e}")
 
-        return containers
-
-    except cpln.errors.APIError as e:
-        print(f"Error listing containers for workload: {e}")
-        return []
+    except Exception as e:
+        print(f"Error during execution demo: {e}")
 
 
-def show_container_health_summary(containers: List[Container]) -> None:
+def list_containers_across_workloads(client: cpln.CPLNClient, gvc_name: str):
     """
-    Show a health summary of containers.
-
-    Args:
-        containers: List of Container instances
-    """
-    if not containers:
-        return
-
-    print("\n=== Container Health Summary ===")
-
-    healthy_count = sum(1 for c in containers if c.is_healthy())
-    unhealthy_count = len(containers) - healthy_count
-
-    print(f"Total containers: {len(containers)}")
-    print(f"Healthy: ✅ {healthy_count}")
-    print(f"Unhealthy: ❌ {unhealthy_count}")
-
-    if unhealthy_count > 0:
-        print("\nUnhealthy containers:")
-        for container in containers:
-            if not container.is_healthy():
-                status = container.health_status or "Unknown"
-                print(f"  - {container.workload_name}/{container.name} ({status})")
-
-
-def demonstrate_status_parser_robustness() -> None:
-    """
-    Demonstrate the StatusParser's robustness when handling edge cases and unexpected data types.
-
-    This showcases the defensive programming features that were added to handle
-    malformed or unexpected API responses gracefully.
-    """
-    from cpln.models.containers import HealthEvaluator, StatusParser
-
-    print("\n=== StatusParser Robustness Demonstration ===")
-    print("This demonstrates how the StatusParser handles edge cases gracefully.")
-
-    # Test Case 1: Normal well-formed data
-    print("\n1. 📝 Normal deployment status:")
-    normal_data = {
-        "ready": True,
-        "deploying": False,
-        "endpoint": "https://example.cpln.io",
-        "versions": [
-            {
-                "name": "v1.2.3",
-                "ready": True,
-                "workload": "example-workload",
-                "gvc": "example-gvc",
-            }
-        ],
-    }
-
-    parsed = StatusParser.parse_deployment_status(normal_data)
-    health = HealthEvaluator.get_health_summary(parsed)
-    print(f"   ✅ Ready: {parsed['ready']}, Version: {parsed['latest_version_name']}")
-    print(f"   ✅ Health: {health['health_status']} - {health['reason']}")
-
-    # Test Case 2: Edge case with unexpected data types
-    print("\n2. 🔧 Edge case - unexpected data types:")
-    edge_case_data = {
-        "ready": "not_a_boolean",  # String instead of boolean
-        "deploying": 1,  # Integer instead of boolean
-        "versions": "not_a_list",  # String instead of list
-    }
-
-    print(
-        f"   📥 Input: ready={edge_case_data['ready']!r} (type: {type(edge_case_data['ready']).__name__})"
-    )
-    print(
-        f"   📥 Input: versions={edge_case_data['versions']!r} (type: {type(edge_case_data['versions']).__name__})"
-    )
-
-    parsed = StatusParser.parse_deployment_status(edge_case_data)
-    health = HealthEvaluator.get_health_summary(parsed)
-    print(
-        f"   ✅ Parsed ready: {parsed['ready']} (type: {type(parsed['ready']).__name__})"
-    )
-    print(f"   ✅ Latest version: {parsed['latest_version_name']} (graceful fallback)")
-    print(f"   ✅ Health: {health['health_status']} - {health['reason']}")
-
-    # Test Case 3: Mixed valid/invalid version data
-    print("\n3. 🔀 Mixed valid/invalid version data:")
-    mixed_data = {
-        "ready": True,
-        "versions": [
-            "invalid_string",  # Invalid
-            {"name": "v1.0.0", "ready": True},  # Valid
-            None,  # Invalid
-            {"incomplete": "data"},  # Valid dict but missing expected fields
-        ],
-    }
-
-    parsed = StatusParser.parse_deployment_status(mixed_data)
-    print(f"   ✅ Found latest valid version: {parsed['latest_version_name']}")
-    print(f"   ✅ Version ready: {parsed['latest_version_ready']}")
-    print(f"   🛡️  Parser handled {len(mixed_data['versions'])} mixed items gracefully")
-
-    # Test Case 4: Empty/minimal data
-    print("\n4. 📭 Empty deployment status:")
-    empty_data = {}
-
-    parsed = StatusParser.parse_deployment_status(empty_data)
-    health = HealthEvaluator.get_health_summary(parsed)
-    print(f"   ✅ Ready (default): {parsed['ready']}")
-    print(f"   ✅ Latest version (default): {parsed['latest_version_name']}")
-    print(f"   ✅ Health: {health['health_status']} - {health['reason']}")
-
-    print("\n🛡️  Key Benefits of Robust Parsing:")
-    print("   • Prevents application crashes from unexpected API responses")
-    print("   • Provides consistent data structure regardless of input quality")
-    print("   • Allows graceful degradation when API data is malformed")
-    print("   • Maintains backward compatibility as API schemas evolve")
-    print("   • Improves production system reliability and uptime")
-
-
-def list_containers_across_workloads(
-    client: cpln.CPLNClient, gvc_name: str
-) -> List[Container]:
-    """
-    Example of workload-centric cross-workload container access.
-
-    This shows the recommended pattern for accessing containers across multiple workloads
-    while respecting the workload-centric design.
+    List containers across all workloads in a GVC.
 
     Args:
         client: CPLN client instance
         gvc_name: Name of the GVC
 
     Returns:
-        List of all containers across workloads
+        Total count of containers found
     """
-    print("\n=== Workload-Centric Multi-Workload Container Access ===")
-    print(
-        "Note: This iterates through workloads individually (workload-centric approach)"
-    )
-
-    all_containers = []
+    print("\n=== Container Summary Across All Workloads ===")
 
     try:
         # Get all workloads in the GVC first
@@ -365,41 +153,33 @@ def list_containers_across_workloads(
 
         if not workloads:
             print("No workloads found in this GVC.")
-            return []
+            return 0
 
-        print(
-            f"Found {len(workloads)} workload(s), accessing containers per workload..."
-        )
+        print(f"Found {len(workloads)} workload(s) in GVC '{gvc_name}':")
 
+        total_containers = 0
         for workload in workloads:
             try:
-                # Get containers for each workload using the workload-centric method
-                containers = workload.get_container_objects()
+                # Get containers for each workload
+                containers = workload.get_containers()
+                container_count = len(containers) if containers else 0
+                total_containers += container_count
+
+                print(f"  ├─ {workload.attrs['name']}: {container_count} containers")
 
                 if containers:
-                    print(
-                        f"\n📦 Workload: {workload.attrs['name']} ({len(containers)} containers)"
-                    )
-                    all_containers.extend(containers)
-                else:
-                    print(f"\n📦 Workload: {workload.attrs['name']} (no containers)")
+                    for container in containers:
+                        print(f"     └─ {container.name} ({container.image})")
 
             except Exception as e:
-                print(
-                    f"  ⚠️  Could not get containers for workload {workload.attrs['name']}: {e}"
-                )
-                continue
+                print(f"  ├─ {workload.attrs['name']}: Error getting containers - {e}")
 
-        if not all_containers:
-            print("No containers found in any workloads.")
-        else:
-            print(f"\n📊 Total containers across all workloads: {len(all_containers)}")
+        print(f"\n📊 Total containers across all workloads: {total_containers}")
+        return total_containers
 
-        return all_containers
-
-    except cpln.errors.APIError as e:
+    except Exception as e:
         print(f"Error listing workloads: {e}")
-        return []
+        return 0
 
 
 def main():
@@ -446,31 +226,31 @@ def main():
 
     # Example 1: List containers for a specific workload (preferred workload-centric approach)
     print("\n1. Workload-centric container access (recommended):")
-    containers = list_containers_for_workload(client, gvc_name, workload_name)
+    containers = list_workload_containers(client, gvc_name, workload_name)
 
-    # Example 2: List containers with location filter for specific workload
-    if containers:
-        sample_location = containers[0].location
-        print("\n2. Workload-centric container access with location filter:")
-        list_containers_with_location_filter(
-            client, gvc_name, workload_name, sample_location
-        )
+    if not containers:
+        print(f"\n❌ Could not access workload '{workload_name}' in GVC '{gvc_name}'")
+        print("Please check that the GVC and workload exist and you have access.")
+        return
 
-    # Example 3: List containers using the ContainerCollection API (workload-centric)
-    print("\n3. Using ContainerCollection API (workload-centric):")
-    list_containers_by_workload(client, gvc_name, workload_name)
+    # Example 2: Overview of all containers in the GVC
+    print(f"\n2. Overview of all containers in GVC '{gvc_name}':")
+    try:
+        workloads = client.workloads.list(gvc=gvc_name)
+        total_containers = 0
 
-    # Example 4: Multi-workload access (shows proper workload-centric pattern)
-    print("\n4. Multi-workload container access (workload-centric pattern):")
-    all_containers = list_containers_across_workloads(client, gvc_name)
+        for workload in workloads:
+            try:
+                workload_containers = workload.get_containers()
+                container_count = len(workload_containers) if workload_containers else 0
+                total_containers += container_count
+                print(f"  ├─ {workload.attrs['name']}: {container_count} containers")
+            except Exception as e:
+                print(f"  ├─ {workload.attrs['name']}: Error getting containers - {e}")
 
-    # Example 5: Show health summary (if any containers were found)
-    if all_containers:
-        show_container_health_summary(all_containers)
-
-    # Example 6: Demonstrate StatusParser robustness
-    print("\n6. StatusParser robustness demonstration:")
-    demonstrate_status_parser_robustness()
+        print(f"\n📊 Total containers across all workloads: {total_containers}")
+    except Exception as e:
+        print(f"Error listing workloads: {e}")
 
     print("\n=== Workload-Centric Design Principles ===")
     print("✅ Always access containers through their parent workload")

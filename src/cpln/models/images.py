@@ -52,9 +52,9 @@ class ImageCollection(Collection):
             (:py:class:`Image`): The image.
 
         Raises:
-            :py:class:`docker.errors.ImageNotFound`
+            :py:class:`cpln.errors.ImageNotFound`
                 If the image does not exist.
-            :py:class:`docker.errors.APIError`
+            :py:class:`cpln.errors.APIError`
                 If the server returns an error.
         """
         return self.prepare_model(self.client.api.get_image(image_id))
@@ -67,7 +67,7 @@ class ImageCollection(Collection):
             (list of :py:class:`Image`): The images.
 
         Raises:
-            :py:class:`docker.errors.APIError`
+            :py:class:`cpln.errors.APIError`
                 If the server returns an error.
         """
         resp = self.client.api.get_image()["items"]

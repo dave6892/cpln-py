@@ -4,7 +4,6 @@ Example script demonstrating how to list and inspect workloads using the CPLN Py
 """
 
 import sys
-from typing import List
 
 import cpln
 from cpln.exceptions import CPLNError
@@ -36,7 +35,7 @@ def get_cpln_client() -> cpln.CPLNClient:
         raise
 
 
-def list_workloads(client: cpln.CPLNClient, gvc: str) -> List[Workload]:
+def list_workloads(client: cpln.CPLNClient, gvc: str) -> list[Workload]:
     """
     List all workloads in a specified GVC.
 
@@ -80,7 +79,44 @@ def main() -> None:
         print(f"\nFound {len(workloads)} workloads in GVC '{gvc_name}':")
         for workload in workloads:
             print(f"\nWorkload: {workload.name}")
-            print(f"Status: {workload.get_spec_state()}")
+
+            # Get workload spec and containers using the proper API
+            try:
+                spec = workload.get_spec()
+                print(f"Type: {spec.type}")
+
+                containers = workload.get_containers()
+                print(f"Containers: {len(containers)}")
+
+                for i, container in enumerate(containers):
+                    print(f"  Container {i+1}: {container.name}")
+                    print(f"    Image: {container.image}")
+                    print(f"    CPU: {container.cpu}")
+                    print(f"    Memory: {container.memory}")
+                    if container.ports:
+                        print(f"    Ports: {len(container.ports)}")
+                        for port in container.ports:
+                            print(f"      {port.number}/{port.protocol}")
+                    print(f"    Inherit Env: {container.inherit_env}")
+
+            except Exception as e:
+                print(f"Error getting spec/containers: {e}")
+                # Fallback to raw data if parsing fails
+                if "spec" in workload.attrs:
+                    spec_data = workload.attrs["spec"]
+                    print(f"Type: {spec_data.get('type', 'Unknown')}")
+                    if "containers" in spec_data:
+                        print(f"Containers: {len(spec_data['containers'])} (raw data)")
+
+            # Try to get status information if available in attrs
+            if "status" in workload.attrs:
+                status = workload.attrs["status"]
+                if isinstance(status, dict):
+                    print(f"Status: {status.get('phase', 'Unknown')}")
+                else:
+                    print(f"Status: {status}")
+            else:
+                print("Status: Not available (use deployment status for live status)")
 
     except CPLNError as e:
         print(f"Error: {e}", file=sys.stderr)
