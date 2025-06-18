@@ -1,8 +1,9 @@
 import json
 import os
-from typing import Any
+from typing import Any, Callable, Optional
 
 from dotenv import load_dotenv
+from inflection import underscore
 
 from ..constants import DEFAULT_CPLN_API_URL
 
@@ -48,3 +49,26 @@ def get_default_workload_template(workload_type: str) -> dict[str, Any]:
         raise ValueError(f"Invalid workload type: {workload_type}")
     spec = load_template(os.path.join(os.path.dirname(__file__), template_path))
     return spec
+
+
+def convert_dictionary_keys(
+    data: dict[str, Any],
+    format_func: Callable[[str], str] = underscore,
+    key_map: Optional[dict[str, str]] = None,
+) -> dict[str, Any]:
+    result = {}
+    key_map = key_map or {}
+    for key, value in data.items():
+        new_key = key_map.get(key, format_func(key))
+        if isinstance(value, dict):
+            result[new_key] = convert_dictionary_keys(value, format_func, key_map)
+        elif isinstance(value, list):
+            result[new_key] = [
+                convert_dictionary_keys(item, format_func, key_map)
+                if isinstance(item, dict)
+                else item
+                for item in value
+            ]
+        else:
+            result[new_key] = value
+    return result

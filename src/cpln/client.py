@@ -2,7 +2,6 @@ from typing import Optional
 
 from .api import APIClient
 from .models import (
-    ContainerCollection,
     GVCCollection,
     ImageCollection,
     WorkloadCollection,
@@ -117,15 +116,6 @@ class CPLNClient:
         A collection of workloads in the Control Plane.
         """
         return WorkloadCollection(client=self)
-
-    @property
-    def containers(self):
-        """
-        A collection of containers in the Control Plane.
-
-        Note: Containers are read-only and extracted from workload deployment data.
-        """
-        return ContainerCollection(client=self)
 
 
 from_env = CPLNClient.from_env

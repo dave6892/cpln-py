@@ -11,10 +11,11 @@ from .exit_codes import AwsExitCode, GenericExitCode, PostgresExitCode
 
 
 class WebSocketAPI:
-    def __init__(self, remote_wss: str):
+    def __init__(self, remote_wss: str, verbose: bool = False):
         self.remote_wss = remote_wss
         self._request = None
         self._error = None
+        self.verbose = verbose
 
     def exec(self, **kwargs):
         self._request = kwargs
@@ -106,10 +107,12 @@ class WebSocketAPI:
             self._error = WebSocketConnectionError(
                 f"Connection closed unexpectedly with code {close_status_code}: {close_msg}"
             )
-        print(f"Connection closed, exit code: {close_status_code}")
+        if self.verbose:
+            print(f"Connection closed, exit code: {close_status_code}")
 
     def _on_open(self, ws: WebSocketApp):
-        print("Connection opened")
+        if self.verbose:
+            print("Connection opened")
         try:
             ws.send(json.dumps(self._request, indent=4))
         except Exception as e:

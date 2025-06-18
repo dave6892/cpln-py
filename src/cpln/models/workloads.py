@@ -1,13 +1,15 @@
-from typing import TYPE_CHECKING, Optional
+import random
+from typing import Optional
+
+import inflection
 
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
+from ..parsers.container import Container
+from ..parsers.deployment import Deployment
+from ..parsers.spec import Spec
 from ..utils import get_default_workload_template, load_template
 from .resource import Collection, Model
-from .workload_specs import WorkloadSpecState
-
-if TYPE_CHECKING:
-    from .containers import Container
 
 
 class Workload(Model):
@@ -30,9 +32,11 @@ class Workload(Model):
         """
         return self.client.api.get_workload(self.config())
 
-    def get_spec_state(self) -> WorkloadSpecState:
-        self.get()
-        return WorkloadSpecState.parse_from_spec(self.spec)
+    def get_spec(self) -> Spec:
+        return Spec.parse(self.attrs["spec"])
+
+    def get_deployment(self, location: Optional[str] = None) -> Deployment:
+        return self.client.api.get_workload_deployment(self.config(location=location))
 
     def delete(self) -> None:
         """
@@ -95,7 +99,7 @@ class Workload(Model):
             metadata["spec"]["defaultOptions"]["capacityAI"] = False
 
         response = self.client.api.create_workload(
-            config=self.config(gvc=gvc),
+            config=self.config(gvc=metadata["gvc"]),
             metadata=metadata,
         )
         if response.status_code // 100 == 2:
@@ -110,12 +114,20 @@ class Workload(Model):
     def unsuspend(self) -> None:
         self._change_suspend_state(state=False)
 
-    def exec(self, command: str, location: str):
+    def exec(
+        self,
+        command: str,
+        location: str,
+        container: Optional[str] = None,
+        replica_selector: Optional[int] = None,
+    ):
         """
         Execute a command on the workload.
 
         Args:
             command (str): The command to execute.
+            location (str): The location of the workload.
+            container (str): The container to execute the command on.
 
         Returns:
             (dict): The response from the server.
@@ -124,15 +136,31 @@ class Workload(Model):
             :py:class:`cpln.errors.WebSocketExitCodeError`
                 If the command returns a non-zero exit code.
         """
-        try:
-            return self.client.api.exec_workload(
-                config=self.config(location=location), command=command
-            )
-        except WebSocketExitCodeError as e:
-            print(f"Command failed with exit code: {e}")
-            raise
+        deployment = self.get_deployment(location=location)
+        replicas = deployment.get_replicas()
+        if len(replicas) == 0:
+            raise ValueError(f"No replicas found in workload {self.attrs['name']}")
 
-    def ping(self, location: Optional[str] = None) -> dict[str, any]:
+        replica = replicas.get(container, [])
+        if len(replica) == 0:
+            raise ValueError(
+                f"Container {container} not found in workload {self.attrs['name']}"
+            )
+
+        # Choose a number between 0 and len(replica) - 1 randomly if replica_selector is None
+        index = (
+            replica_selector
+            if replica_selector is not None
+            else random.randint(0, len(replica) - 1)
+        )
+        return replica[index].exec(command)
+
+    def ping(
+        self,
+        location: Optional[str] = None,
+        container: Optional[str] = None,
+        replica_selector: Optional[int] = None,
+    ) -> dict[str, any]:
         """
         Ping the workload.
 
@@ -146,6 +174,8 @@ class Workload(Model):
             self.exec(
                 ["echo", "ping"],
                 location=location,
+                container=container,
+                replica_selector=replica_selector,
             )
             return {
                 "status": 200,
@@ -165,11 +195,18 @@ class Workload(Model):
         """
         Export the workload.
         """
-        self.get()
+        from ..utils.utils import convert_dictionary_keys
+
         return {
-            "name": self.attrs["name"],
+            "name": self.name,
             "gvc": self.state["gvc"],
-            "spec": self.attrs["spec"],
+            "spec": convert_dictionary_keys(
+                self.get_spec().to_dict(),
+                lambda x: inflection.camelize(x, False),
+                key_map={
+                    "capacity_ai": "capacityAI",
+                },
+            ),
         }
 
     def config(
@@ -191,32 +228,6 @@ class Workload(Model):
             location=location,
         )
 
-    def get_remote(self, location: Optional[str] = None) -> str:
-        """
-        Get the remote URL of the workload.
-
-        Args:
-            location (str): The location of the workload.
-                Default: None
-
-        Returns:
-            (str): The remote of the workload.
-        """
-        return self.client.api.get_remote(self.config(location=location))
-
-    def get_remote_wss(self, location: Optional[str] = None) -> str:
-        """
-        Get the remote WSS URL of the workload.
-
-        Args:
-            location (str): The location of the workload.
-                Default: None
-
-        Returns:
-            (str): The remote WSS of the workload.
-        """
-        return self.client.api.get_remote_wss(self.config(location=location))
-
     def get_replicas(self, location: Optional[str] = None) -> list[str]:
         """
         Get the replicas of the workload.
@@ -228,25 +239,9 @@ class Workload(Model):
         Returns:
             (list): The replicas of the workload.
         """
-        return self.client.api.get_replicas(self.config(location=location))
+        return self.get_deployment(location=location).get_replicas()
 
-    def get_containers(self, location: Optional[str] = None) -> list[str]:
-        """
-        Get the containers of the workload (legacy method returning container names).
-
-        Args:
-            location (str): The location of the workload.
-                Default: None
-
-        Returns:
-            (list): The container names of the workload.
-
-        Note:
-            This method is deprecated. Use get_container_objects() for full Container instances.
-        """
-        return self.client.api.get_containers(self.config(location=location))
-
-    def get_container_objects(self, location: Optional[str] = None):
+    def get_containers(self):
         """
         Get containers for this workload with full Container objects.
 
@@ -256,92 +251,20 @@ class Workload(Model):
         Returns:
             List of Container instances with full metadata
         """
-        from .containers import ContainerParser  # Import here to avoid circular imports
+        return self.get_spec().containers
 
-        # Get all locations for this workload
-        locations = [location] if location else self._get_workload_locations()
-
-        containers = []
-        for loc in locations:
-            try:
-                deployment_data = self.client.api.get_workload_deployment(
-                    self.config(location=loc)
-                )
-
-                workload_containers = ContainerParser.parse_deployment_containers(
-                    deployment_data=deployment_data,
-                    workload_name=self.attrs["name"],
-                    gvc_name=self.state["gvc"],
-                    location=loc,
-                )
-                containers.extend(workload_containers)
-
-            except Exception:
-                # Skip locations where deployment data is unavailable
-                continue
-
-        return containers
-
-    def get_container(
-        self, container_name: str, location: Optional[str] = None
-    ) -> Optional["Container"]:
+    def get_container(self, container_name: str) -> Optional["Container"]:
         """
         Get a specific container by name within this workload.
 
         Args:
             container_name: Name of the container to find
-            location: Optional location filter
 
         Returns:
             Container instance if found, None otherwise
         """
-        containers = self.get_container_objects(location=location)
-        for container in containers:
-            if container.name == container_name:
-                return container
-        return None
-
-    def _get_workload_locations(self) -> list[str]:
-        """
-        Get available locations for this workload.
-
-        Returns:
-            List of location names where this workload is deployed
-        """
-        # Try to extract locations from workload spec
-        locations = []
-
-        try:
-            # Check if locations are specified in workload spec
-            spec = self.attrs.get("spec", {})
-            default_options = spec.get("defaultOptions", {})
-
-            # Look for location hints in various places
-            if "locations" in default_options:
-                locations.extend(default_options["locations"])
-
-            # If no locations found, try common location names
-            if not locations:
-                common_locations = [
-                    "aws-us-east-1",
-                    "aws-us-west-2",
-                    "aws-eu-west-1",
-                    "gcp-us-central1",
-                    "azure-eastus",
-                ]
-                locations = common_locations
-
-        except (KeyError, TypeError):
-            # Fallback to common locations if spec parsing fails
-            locations = [
-                "aws-us-east-1",
-                "aws-us-west-2",
-                "aws-eu-west-1",
-                "gcp-us-central1",
-                "azure-eastus",
-            ]
-
-        return locations
+        containers = self.get_containers()
+        return next(filter(lambda c: c.name == container_name, containers), None)
 
     def _change_suspend_state(self, state: bool = True) -> None:
         output = self.client.api.patch_workload(
