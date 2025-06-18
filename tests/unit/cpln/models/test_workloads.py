@@ -202,6 +202,108 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         container: str = "app"
 
+        # Mock the API method to raise a general exception
+        mock_deployment = MagicMock()
+        mock_replica = MagicMock()
+        mock_replica.exec.side_effect = RuntimeError("General error")
+        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
+        self.client.api.get_workload_deployment.return_value = mock_deployment
+
+        result = self.workload.ping(location, container=container)
+
+        self.assertEqual(result["status"], 500)
+        self.assertEqual(result["message"], "General error")
+        self.assertEqual(result["exit_code"], -1)
+
+    def test_exec_no_replicas(self) -> None:
+        """Test exec method when no replicas are found"""
+        command: str = "echo test"
+        location: str = "test-location"
+        container: str = "app"
+
+        # Mock the API method to return a deployment with no replicas
+        mock_deployment = MagicMock()
+        mock_deployment.get_replicas.return_value = {}
+        self.client.api.get_workload_deployment.return_value = mock_deployment
+
+        with self.assertRaises(ValueError) as context:
+            self.workload.exec(command, location, container=container)
+
+        self.assertIn("No replicas found", str(context.exception))
+
+    def test_exec_container_not_found(self) -> None:
+        """Test exec method when container is not found"""
+        command: str = "echo test"
+        location: str = "test-location"
+        container: str = "nonexistent-container"
+
+        # Mock the API method to return a deployment with different containers
+        mock_deployment = MagicMock()
+        mock_deployment.get_replicas.return_value = {"other-container": []}
+        self.client.api.get_workload_deployment.return_value = mock_deployment
+
+        with self.assertRaises(ValueError) as context:
+            self.workload.exec(command, location, container=container)
+
+        self.assertIn(
+            "Container nonexistent-container not found", str(context.exception)
+        )
+
+    def test_get_replicas(self) -> None:
+        """Test get_replicas method"""
+        location: str = "test-location"
+        expected_replicas = ["replica1", "replica2"]
+
+        # Mock the API method
+        mock_deployment = MagicMock()
+        mock_deployment.get_replicas.return_value = expected_replicas
+        self.client.api.get_workload_deployment.return_value = mock_deployment
+
+        result = self.workload.get_replicas(location)
+
+        self.assertEqual(result, expected_replicas)
+        self.client.api.get_workload_deployment.assert_called_once_with(
+            self.workload.config(location=location)
+        )
+
+    def test_get_containers(self) -> None:
+        """Test get_containers method"""
+        # The actual method returns containers from the spec, so let's test the real behavior
+        result = self.workload.get_containers()
+
+        # Should return a list of Container objects
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)  # From our test data
+        self.assertEqual(result[0].name, "app")
+        self.assertEqual(result[0].image, "nginx:latest")
+
+    def test_get_container_found(self) -> None:
+        """Test get_container method when container is found"""
+        # Test with the real container from our workload data
+        result = self.workload.get_container("app")
+
+        # Should find the container with name "app"
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "app")
+        self.assertEqual(result.image, "nginx:latest")
+
+    def test_get_container_not_found(self) -> None:
+        """Test get_container method when container is not found"""
+        # Mock containers
+        mock_container1 = MagicMock()
+        mock_container1.name = "app"
+
+        with patch.object(
+            self.workload, "get_containers", return_value=[mock_container1]
+        ):
+            result = self.workload.get_container("nonexistent")
+            self.assertIsNone(result)
+
+    def test_ping_general_exception_original(self) -> None:
+        """Test ping method with general exception"""
+        location: str = "test-location"
+        container: str = "app"
+
         # Mock the API method to return a deployment with replicas
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
