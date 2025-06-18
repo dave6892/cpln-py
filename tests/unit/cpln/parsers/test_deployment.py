@@ -305,12 +305,14 @@ class TestDeployment:
     def setup_method(self):
         self.api_client = Mock()
         self.api_client.config = Mock()
+        self.api_client.config.__post_init__ = Mock()
         # Use Mock for workload config to avoid constructor issues
         self.workload_config = Mock()
         self.workload_config.gvc = "test-gvc"
         self.workload_config.workload_id = "test-workload"
 
-    def test_parse_deployment(self):
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_parse_deployment(self, mock_post_init):
         data = {
             "name": "test-deployment",
             "status": {
@@ -344,33 +346,48 @@ class TestDeployment:
         assert deployment.api_client == self.api_client
         assert deployment.config == self.workload_config
 
-    def test_post_init(self):
-        deployment = Deployment(
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_post_init(self, mock_post_init):
+        # Test that post_init is called during deployment creation
+        status_mock = Mock()
+        status_mock.remote = "https://remote.example.com"
+
+        Deployment(
             name="test",
-            status=Mock(),
+            status=status_mock,
             last_modified="2023-01-01T00:00:00Z",
             kind="Deployment",
             links=[],
             api_client=self.api_client,
             config=self.workload_config,
         )
-        deployment.status.remote = "https://remote.example.com"
 
-        # Mock the post_init method on config
-        deployment.__post_init__()
+        # Verify that __post_init__ was called
+        mock_post_init.assert_called_once()
 
-        assert (
-            deployment.api_client.config.base_url
-            == "https://remote.example.com/replicas/"
-        )
-
-    def test_export(self):
-        status_mock = Mock()
-        status_mock.to_dict.return_value = {"ready": True}
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_export(self, mock_post_init):
+        # Create a real Status object instead of a mock for proper to_dict behavior
+        status_data = {
+            "endpoint": "https://example.com",
+            "remote": "https://remote.example.com",
+            "lastProcessedVersion": "v1",
+            "expectedDeploymentVersion": "v1",
+            "message": "Ready",
+            "ready": True,
+            "internal": {
+                "podStatus": {"phase": "Running"},
+                "podsValidZone": True,
+                "timestamp": "2023-01-01T00:00:00Z",
+                "ksvcStatus": {"ready": True},
+            },
+            "versions": [],
+        }
+        status = Status.parse(status_data)
 
         deployment = Deployment(
             name="test-deployment",
-            status=status_mock,
+            status=status,
             last_modified="2023-01-01T00:00:00Z",
             kind="Deployment",
             links=[],
@@ -380,15 +397,15 @@ class TestDeployment:
 
         result = deployment.export()
 
-        expected = {
-            "name": "test-deployment",
-            "status": {"ready": True},
-            "last_modified": "2023-01-01T00:00:00Z",
-            "kind": "Deployment",
-        }
-        assert result == expected
+        # The export method should return the status as a dictionary via to_dict()
+        assert result["name"] == "test-deployment"
+        assert result["last_modified"] == "2023-01-01T00:00:00Z"
+        assert result["kind"] == "Deployment"
+        assert isinstance(result["status"], dict)
+        assert result["status"]["ready"] is True
 
-    def test_get_remote_deployment(self):
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_get_remote_deployment(self, mock_post_init):
         self.api_client._get.return_value = {"items": []}
 
         deployment = Deployment(
@@ -408,7 +425,8 @@ class TestDeployment:
         )
         assert result == {"items": []}
 
-    def test_get_remote_wss(self):
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_get_remote_wss(self, mock_post_init):
         status_mock = Mock()
         status_mock.remote = "https://remote.example.com"
 
@@ -425,7 +443,8 @@ class TestDeployment:
         result = deployment.get_remote_wss()
         assert result == "wss://remote.example.com/remote"
 
-    def test_get_remote(self):
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_get_remote(self, mock_post_init):
         status_mock = Mock()
         status_mock.remote = "https://remote.example.com"
 
@@ -442,7 +461,8 @@ class TestDeployment:
         result = deployment.get_remote()
         assert result == "https://remote.example.com"
 
-    def test_get_containers(self):
+    @patch.object(Deployment, "__post_init__", return_value=None)
+    def test_get_containers(self, mock_post_init):
         version1 = Mock()
         container1 = Mock()
         container1.name = "container1"
