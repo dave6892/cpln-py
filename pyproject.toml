@@ -159,3 +159,31 @@ line-ending = "auto"
 
 [tool.ruff.lint.isort]
 known-first-party = ["your_package_name"]  # Replace with your package name
+
+[tool.coverage.run]
+source = ["src/cpln"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/.*",
+    "*/examples/*",
+    "*/example_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+skip_covered = false
+ignore_errors = true
