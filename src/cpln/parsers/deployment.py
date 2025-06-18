@@ -12,6 +12,16 @@ from .base import BaseParser, preparse
 
 @dataclass
 class ContainerDeploymentResources(BaseParser):
+    """
+    Represents resource allocation for a container deployment.
+
+    Attributes:
+        memory (int): Memory allocation in bytes
+        cpu (int): CPU allocation
+        replicas (int): Total number of replicas
+        replicas_ready (int): Number of ready replicas
+    """
+
     memory: int
     cpu: int
     replicas: int
@@ -43,9 +53,92 @@ class ContainerDeployment(BaseParser):
             resources=ContainerDeploymentResources.parse(resources),
         )
 
+    def is_healthy(self) -> bool:
+        """
+        Determine if the container deployment is healthy.
+
+        Returns:
+            bool: True if the container is considered healthy, False otherwise
+
+        A container is considered healthy if:
+        - It is ready (self.ready is True)
+        - Has at least one ready replica
+        - Message doesn't indicate error states
+        """
+        # Basic readiness check
+        if not self.ready:
+            return False
+
+        # Check if we have ready replicas
+        if self.resources.replicas_ready == 0:
+            return False
+
+        # Check for common error message patterns
+        error_keywords = [
+            "error",
+            "failed",
+            "crash",
+            "terminated",
+            "unhealthy",
+            "unavailable",
+            "timeout",
+        ]
+
+        message_lower = self.message.lower() if self.message else ""
+        if any(keyword in message_lower for keyword in error_keywords):
+            return False
+
+        return True
+
+    def get_resource_utilization(self) -> dict[str, Optional[float]]:
+        """
+        Calculate resource utilization percentages for the container.
+
+        Returns:
+            dict: Dictionary containing utilization percentages:
+                - 'replica_utilization': Percentage of replicas that are ready
+                - 'cpu': CPU utilization (placeholder - actual metrics would need monitoring API)
+                - 'memory': Memory utilization (placeholder - actual metrics would need monitoring API)
+
+        Note:
+            CPU and memory utilization require access to metrics/monitoring APIs
+            which are not available through the standard Control Plane deployment API.
+            These return None as placeholders for potential future implementation.
+        """
+        utilization = {
+            "replica_utilization": None,
+            "cpu": None,  # Would need metrics API access
+            "memory": None,  # Would need metrics API access
+        }
+
+        # Calculate replica utilization if we have replica data
+        if self.resources.replicas > 0:
+            utilization["replica_utilization"] = (
+                self.resources.replicas_ready / self.resources.replicas
+            ) * 100.0
+        else:
+            utilization["replica_utilization"] = 0.0
+
+        # CPU and memory utilization would require additional API calls
+        # to monitoring/metrics endpoints that aren't part of the deployment API
+        # For now, these remain None as placeholders
+
+        return utilization
+
 
 @dataclass
 class Version(BaseParser):
+    """
+    Represents a deployment version from the Control Plane API.
+
+    Attributes:
+        message (str): Status message for this version
+        ready (bool): Whether this version is ready
+        containers (list[ContainerDeployment]): List of container deployments
+        created (str): Creation timestamp
+        workload (int): The workload version number
+    """
+
     message: str
     ready: bool
     containers: list[ContainerDeployment]
@@ -64,6 +157,16 @@ class Version(BaseParser):
 
 @dataclass
 class Internal(BaseParser):
+    """
+    Represents internal deployment status information.
+
+    Attributes:
+        pod_status (dict[str, Any]): Kubernetes pod status information
+        pods_valid_zone (bool): Whether pods are in a valid zone
+        timestamp (str): Timestamp of status
+        ksvc_status (dict[str, Any]): Knative service status information
+    """
+
     pod_status: dict[str, Any]
     pods_valid_zone: bool
     timestamp: str
@@ -72,6 +175,20 @@ class Internal(BaseParser):
 
 @dataclass
 class Status(BaseParser):
+    """
+    Represents the status of a deployment.
+
+    Attributes:
+        endpoint (str): The deployment endpoint URL
+        remote (str): Remote endpoint URL
+        last_processed_version (str): Last processed version identifier
+        expected_deployment_version (str): Expected deployment version
+        message (str): Status message
+        internal (Internal): Internal status information
+        ready (bool): Whether the deployment is ready
+        versions (list[Version]): List of deployment versions
+    """
+
     endpoint: str
     remote: str
     last_processed_version: str
@@ -95,6 +212,14 @@ class Status(BaseParser):
 
 @dataclass
 class Link(BaseParser):
+    """
+    Represents a link object from the API response.
+
+    Attributes:
+        rel (str): The relationship type of the link
+        href (str): The URL of the link
+    """
+
     rel: str
     href: str
 
@@ -105,6 +230,17 @@ class APIClient(requests.Session):
 
 @dataclass
 class WorkloadReplica(BaseParser):
+    """
+    Represents a replica of a workload container.
+
+    Attributes:
+        name (str): Name of the replica
+        container (str): Container name
+        config (WorkloadConfig): Workload configuration
+        api_config (APIConfig): API configuration
+        remote_wss (str): Remote WebSocket URL
+    """
+
     name: str
     container: str
     config: WorkloadConfig
@@ -162,6 +298,22 @@ class WorkloadReplica(BaseParser):
 
 @dataclass
 class Deployment(BaseParser):
+    """
+    Represents a deployment in the Control Plane system.
+
+    This class encapsulates deployment information including status, metadata,
+    and provides methods for interacting with deployment replicas.
+
+    Attributes:
+        name (str): Name of the deployment
+        status (Status): Current deployment status
+        last_modified (str): Last modification timestamp
+        kind (str): Type/kind of the deployment
+        links (list[Link]): Related links for this deployment
+        api_client (Optional[APIClient]): API client for making requests
+        config (Optional[WorkloadConfig]): Workload configuration
+    """
+
     name: str
     status: Status
     last_modified: str
@@ -171,8 +323,9 @@ class Deployment(BaseParser):
     config: Optional[WorkloadConfig] = None
 
     def __post_init__(self):
-        self.api_client.config.base_url = self.get_remote() + "/replicas/"
-        self.api_client.config.__post_init__()
+        # Don't modify the original API client at all
+        # We'll create a separate config only when needed for replica operations
+        pass
 
     def export(self) -> dict[str, Any]:
         data = self.to_dict()

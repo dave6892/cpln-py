@@ -11,13 +11,51 @@ from .exit_codes import AwsExitCode, GenericExitCode, PostgresExitCode
 
 
 class WebSocketAPI:
+    """
+    WebSocket API client for executing commands in Control Plane workload containers.
+
+    This class provides a WebSocket-based interface to execute commands within
+    running workload containers through the Control Plane API.
+
+    Attributes:
+        remote_wss (str): The WebSocket URL for the remote container
+        verbose (bool): Whether to enable verbose logging
+    """
+
     def __init__(self, remote_wss: str, verbose: bool = False):
+        """
+        Initialize the WebSocket API client.
+
+        Args:
+            remote_wss (str): The WebSocket URL for the remote container
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
+        """
         self.remote_wss = remote_wss
         self._request = None
         self._error = None
         self.verbose = verbose
 
     def exec(self, **kwargs):
+        """
+        Execute a command in the remote container via WebSocket.
+
+        Args:
+            **kwargs: Command execution parameters including:
+                - token: Authentication token
+                - org: Organization name
+                - gvc: Global Virtual Cluster name
+                - container: Container name
+                - pod: Pod name
+                - command: Command to execute
+
+        Returns:
+            dict: The original request parameters
+
+        Raises:
+            WebSocketConnectionError: If connection fails
+            WebSocketExitCodeError: If command exits with non-zero code
+            WebSocketOperationError: If operation fails
+        """
         self._request = kwargs
         self._error = None
         ws = self.websocket()
@@ -29,6 +67,12 @@ class WebSocketAPI:
         return self._request
 
     def websocket(self):
+        """
+        Create and configure a WebSocket connection.
+
+        Returns:
+            WebSocketApp: Configured WebSocket application instance
+        """
         ws = WebSocketApp(
             self.remote_wss,
             on_message=self._on_message,

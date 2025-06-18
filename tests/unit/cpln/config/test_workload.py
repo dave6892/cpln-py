@@ -16,6 +16,16 @@ def test_workload_config_creation():
     assert config.specs == specs
 
 
+def test_workload_config_optional_params():
+    """Test WorkloadConfig with optional parameters."""
+    config = WorkloadConfig(gvc="test-gvc", workload_id="test-workload")
+
+    assert config.gvc == "test-gvc"
+    assert config.workload_id == "test-workload"
+    assert config.location is None
+    assert config.specs is None
+
+
 def test_json_typed_dict():
     """Test JSON TypedDict can accept various types."""
     # This test ensures JSON is properly defined as a TypedDict

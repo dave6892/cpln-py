@@ -31,8 +31,14 @@ class WorkloadDeploymentMixin:
             raise ValueError("Config not set properly")
 
         endpoint = f"gvc/{config.gvc}/workload/{config.workload_id}/deployment"
+
+        print(f"Debug: config = {config}")
+        print(f"Debug: client = {self.__dict__}")
+
         if config.location:
             endpoint += f"/{config.location}"
+
+        print(f"Debug: endpoint = {endpoint}")
 
         deployment_data_raw = self._get(endpoint)
 
@@ -82,7 +88,17 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
         metadata: dict[str, Any],
     ):
         """
-        Creates a workload.
+        Creates a new workload in the specified GVC.
+
+        Args:
+            config (WorkloadConfig): Configuration object containing workload details
+            metadata (dict[str, Any]): The workload metadata including spec and configuration
+
+        Returns:
+            requests.Response: The response from the API
+
+        Raises:
+            APIError: If the request fails
         """
         endpoint = f"gvc/{config.gvc}/workload"
         return self._post(endpoint, data=metadata)

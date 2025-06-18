@@ -33,6 +33,95 @@ class TestContainerDeployment:
         assert container.resources.memory == 128
         assert container.resources.cpu == 100
 
+    def test_is_healthy_when_ready_and_has_replicas(self):
+        data = {
+            "name": "healthy-container",
+            "image": "nginx:latest",
+            "ready": True,
+            "message": "Running",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 2, "replicasReady": 2},
+        }
+        container = ContainerDeployment.parse(data)
+        assert container.is_healthy() is True
+
+    def test_is_healthy_when_not_ready(self):
+        data = {
+            "name": "unhealthy-container",
+            "image": "nginx:latest",
+            "ready": False,
+            "message": "Starting",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 1, "replicasReady": 0},
+        }
+        container = ContainerDeployment.parse(data)
+        assert container.is_healthy() is False
+
+    def test_is_healthy_when_no_ready_replicas(self):
+        data = {
+            "name": "unhealthy-container",
+            "image": "nginx:latest",
+            "ready": True,
+            "message": "Ready",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 2, "replicasReady": 0},
+        }
+        container = ContainerDeployment.parse(data)
+        assert container.is_healthy() is False
+
+    def test_is_healthy_with_error_message(self):
+        data = {
+            "name": "error-container",
+            "image": "nginx:latest",
+            "ready": True,
+            "message": "Container failed to start",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 1, "replicasReady": 1},
+        }
+        container = ContainerDeployment.parse(data)
+        assert container.is_healthy() is False
+
+    def test_get_resource_utilization_full_replicas(self):
+        data = {
+            "name": "test-container",
+            "image": "nginx:latest",
+            "ready": True,
+            "message": "Ready",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 3, "replicasReady": 3},
+        }
+        container = ContainerDeployment.parse(data)
+        utilization = container.get_resource_utilization()
+
+        assert utilization["replica_utilization"] == 100.0
+        assert utilization["cpu"] is None  # Placeholder
+        assert utilization["memory"] is None  # Placeholder
+
+    def test_get_resource_utilization_partial_replicas(self):
+        data = {
+            "name": "test-container",
+            "image": "nginx:latest",
+            "ready": True,
+            "message": "Ready",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 4, "replicasReady": 2},
+        }
+        container = ContainerDeployment.parse(data)
+        utilization = container.get_resource_utilization()
+
+        assert utilization["replica_utilization"] == 50.0
+        assert utilization["cpu"] is None
+        assert utilization["memory"] is None
+
+    def test_get_resource_utilization_no_replicas(self):
+        data = {
+            "name": "test-container",
+            "image": "nginx:latest",
+            "ready": False,
+            "message": "Stopped",
+            "resources": {"memory": 128, "cpu": 100, "replicas": 0, "replicasReady": 0},
+        }
+        container = ContainerDeployment.parse(data)
+        utilization = container.get_resource_utilization()
+
+        assert utilization["replica_utilization"] == 0.0
+        assert utilization["cpu"] is None
+        assert utilization["memory"] is None
+
 
 class TestVersion:
     def test_parse_with_containers(self):

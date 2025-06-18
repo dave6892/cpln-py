@@ -33,9 +33,28 @@ class Workload(Model):
         return self.client.api.get_workload(self.config())
 
     def get_spec(self) -> Spec:
+        """
+        Get the workload specification.
+
+        Returns:
+            Spec: The parsed workload specification
+        """
         return Spec.parse(self.attrs["spec"])
 
     def get_deployment(self, location: Optional[str] = None) -> Deployment:
+        """
+        Get the deployment information for this workload.
+
+        Args:
+            location (Optional[str]): The location/region to get deployment from.
+                If None, gets deployment from default location.
+
+        Returns:
+            Deployment: The deployment information for the workload
+
+        Raises:
+            APIError: If the request fails
+        """
         return self.client.api.get_workload_deployment(self.config(location=location))
 
     def delete(self) -> None:
@@ -109,9 +128,19 @@ class Workload(Model):
             raise RuntimeError(f"API call failed with status {response.status_code}")
 
     def suspend(self) -> None:
+        """
+        Suspend the workload.
+
+        This will stop the workload from running while preserving its configuration.
+        """
         self._change_suspend_state(state=True)
 
     def unsuspend(self) -> None:
+        """
+        Unsuspend (resume) the workload.
+
+        This will resume the workload from a suspended state.
+        """
         self._change_suspend_state(state=False)
 
     def exec(

@@ -1,3 +1,9 @@
+"""Utility functions and classes for the CPLN SDK.
+
+This module provides various utility functions for configuration management,
+template loading, and WebSocket communication.
+"""
+
 from .utils import get_default_workload_template, kwargs_from_env, load_template
 from .websocket import WebSocketAPI
 
