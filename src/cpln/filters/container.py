@@ -56,8 +56,17 @@ class ContainerFilterOptions:
 
         for pattern in patterns_to_check:
             try:
-                # Test if pattern is valid regex
-                re.compile(pattern)
+                # Convert glob patterns to regex for validation
+                if "*" in pattern or "?" in pattern:
+                    # Simple glob to regex conversion (same as in _match_patterns)
+                    regex_pattern = pattern.replace("*", ".*").replace("?", ".")
+                    regex_pattern = f"^{regex_pattern}$"
+                else:
+                    # Treat as regex pattern
+                    regex_pattern = pattern
+
+                # Test if the resulting pattern is valid regex
+                re.compile(regex_pattern)
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern '{pattern}': {e}") from e
 
