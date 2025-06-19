@@ -66,6 +66,7 @@ class AdvancedQueryParser:
         "image": str,
         "status": str,
         "health": str,
+        "gvc": str,
         "cpu": float,
         "memory": float,
         "replicas": int,
@@ -134,13 +135,16 @@ class AdvancedQueryParser:
             (r"\bOR\b", "logical"),
             (r"\bNOT\b", "logical"),
             (r">=|<=|!=|[><=:~]", "operator"),
-            (r"[a-zA-Z_][a-zA-Z0-9_]*", "field"),
             (r'"[^"]*"', "quoted_value"),
             (r"'[^']*'", "quoted_value"),
             (r"\d+\.\d+", "float_value"),
             (r"\d+[dhms]", "duration_value"),
             (r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?", "datetime_value"),
             (r"\d+", "int_value"),
+            (
+                r"[a-zA-Z_][a-zA-Z0-9_*]*",
+                "field",
+            ),  # Allow asterisks in field/value tokens
             (r"[^\s()]+", "value"),
         ]
 

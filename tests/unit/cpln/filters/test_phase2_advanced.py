@@ -4,8 +4,7 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
 import pytest
-
-from src.cpln.filters.enhanced import (
+from cpln.filters.enhanced import (
     ContainerTimeInfo,
     CrossWorkloadContainerDiscovery,
     EnhancedContainerFilter,
@@ -15,7 +14,7 @@ from src.cpln.filters.enhanced import (
     SortOptions,
     SortOrder,
 )
-from src.cpln.filters.query_parser import (
+from cpln.filters.query_parser import (
     AdvancedQueryParser,
     LogicalExpression,
     QueryExpression,
@@ -406,7 +405,7 @@ class TestCrossWorkloadContainerDiscovery:
         self.mock_client = Mock()
         self.discovery = CrossWorkloadContainerDiscovery(self.mock_client)
 
-    @patch("src.cpln.filters.enhanced.EnhancedContainerFilter")
+    @patch("cpln.filters.enhanced.EnhancedContainerFilter")
     def test_discover_containers_in_gvc(self, mock_filter):
         """Test discovering containers within a single GVC."""
         # Mock workload with containers
