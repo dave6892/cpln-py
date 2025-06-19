@@ -5,6 +5,7 @@ import inflection
 
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
+from ..filters.container import ContainerFilterOptions
 from ..parsers.container import Container
 from ..parsers.deployment import Deployment
 from ..parsers.spec import Spec
@@ -294,6 +295,96 @@ class Workload(Model):
         """
         containers = self.get_containers()
         return next(filter(lambda c: c.name == container_name, containers), None)
+
+    def find_containers(
+        self, filters: Optional["ContainerFilterOptions"] = None
+    ) -> list["Container"]:
+        """
+        Find containers within this workload matching the specified filters.
+
+        This method filters containers based on workload specifications (not live deployment data).
+        For live container status, use get_deployment().find_containers() instead.
+
+        Args:
+            filters: ContainerFilterOptions instance with filtering criteria
+
+        Returns:
+            List of Container instances matching the filter criteria
+
+        Example:
+            # Find containers with specific image patterns
+            filters = ContainerFilterOptions(image_patterns=["nginx*", "redis*"])
+            containers = workload.find_containers(filters)
+
+            # Find containers by name
+            filters = ContainerFilterOptions(name_patterns=["web-*"])
+            containers = workload.find_containers(filters)
+        """
+        from ..filters.container import _match_patterns
+
+        if filters is None:
+            return self.get_containers()
+
+        if not filters.has_filters():
+            return self.get_containers()
+
+        all_containers = self.get_containers()
+        filtered_containers = []
+
+        for container in all_containers:
+            # Check name pattern matching
+            if filters.name_patterns and not _match_patterns(
+                container.name, filters.name_patterns
+            ):
+                continue
+
+            # Check image pattern matching
+            if filters.image_patterns and not _match_patterns(
+                container.image, filters.image_patterns
+            ):
+                continue
+
+            # Check port filtering
+            if filters.port_filters:
+                container_ports = {port.number for port in container.ports}
+                if not any(port in container_ports for port in filters.port_filters):
+                    continue
+
+            # Check environment variable filtering
+            if filters.environment_filters and container.env:
+                env_match = True
+                for env_key, env_value in filters.environment_filters.items():
+                    if container.env.get(env_key) != env_value:
+                        env_match = False
+                        break
+                if not env_match:
+                    continue
+
+            # Note: Health status and resource threshold filtering are not available
+            # for workload specification containers. These filters are only applicable
+            # to deployment containers which have live status information.
+            if filters.health_status or filters.resource_thresholds:
+                # Log a warning or could raise an exception
+                # For now, we'll skip these filters for spec containers
+                pass
+
+            filtered_containers.append(container)
+
+        return filtered_containers
+
+    def count_containers(
+        self, filters: Optional["ContainerFilterOptions"] = None
+    ) -> int:
+        """
+        Count containers within this workload matching the specified filters.
+
+        Args:
+            filters: ContainerFilterOptions instance with filtering criteria
+
+        Returns:
+            Number of containers matching the filter criteria
+        """
+        return len(self.find_containers(filters))
 
     def _change_suspend_state(self, state: bool = True) -> None:
         output = self.client.api.patch_workload(

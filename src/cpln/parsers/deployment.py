@@ -6,6 +6,7 @@ import requests
 from ..api.config import APIConfig
 from ..config import WorkloadConfig
 from ..errors import WebSocketExitCodeError
+from ..filters.container import ContainerFilterOptions
 from ..utils import WebSocketAPI
 from .base import BaseParser, preparse
 
@@ -389,3 +390,145 @@ class Deployment(BaseParser):
             for version in self.status.versions
             for container in version.containers
         }
+
+    def find_containers(
+        self, filters: Optional["ContainerFilterOptions"] = None
+    ) -> dict[str, ContainerDeployment]:
+        """
+        Find containers within this deployment matching the specified filters.
+
+        This method filters live deployment containers with health status and resource data.
+        Unlike workload specification filtering, this includes live status information.
+
+        Args:
+            filters: ContainerFilterOptions instance with filtering criteria
+
+        Returns:
+            Dict of container name -> ContainerDeployment instances matching the filter criteria
+
+        Example:
+            # Find unhealthy containers
+            filters = ContainerFilterOptions(health_status=["unhealthy"])
+            containers = deployment.find_containers(filters)
+
+            # Find containers with high resource usage
+            filters = ContainerFilterOptions(resource_thresholds={"replica_utilization": 80.0})
+            containers = deployment.find_containers(filters)
+        """
+        from ..filters.container import (
+            _match_patterns,
+            _match_resource_thresholds,
+        )
+
+        if filters is None:
+            return self.get_containers()
+
+        if not filters.has_filters():
+            return self.get_containers()
+
+        all_containers = self.get_containers()
+        filtered_containers = {}
+
+        for name, container in all_containers.items():
+            # Check name pattern matching
+            if filters.name_patterns and not _match_patterns(
+                container.name, filters.name_patterns
+            ):
+                continue
+
+            # Check image pattern matching
+            if filters.image_patterns and not _match_patterns(
+                container.image, filters.image_patterns
+            ):
+                continue
+
+            # Check health status filtering (available for deployment containers)
+            if filters.health_status:
+                container_health = "healthy" if container.is_healthy() else "unhealthy"
+                if container_health not in filters.health_status:
+                    continue
+
+            # Check resource threshold filtering (available for deployment containers)
+            if filters.resource_thresholds:
+                container_resources = container.get_resource_utilization()
+                if not _match_resource_thresholds(
+                    container_resources, filters.resource_thresholds
+                ):
+                    continue
+
+            # Check replica state filtering
+            if filters.replica_states and (
+                (container.ready and "ready" not in filters.replica_states)
+                or (not container.ready and "pending" not in filters.replica_states)
+            ):
+                continue
+
+            # Note: Port and environment filtering are not available for deployment containers
+            # as this information is in the workload specification, not deployment status
+            if filters.port_filters or filters.environment_filters:
+                # These filters require workload specification data
+                # For now, we'll skip these filters for deployment containers
+                pass
+
+            filtered_containers[name] = container
+
+        return filtered_containers
+
+    def get_unhealthy_containers(self) -> dict[str, ContainerDeployment]:
+        """
+        Quick access to unhealthy containers in this deployment.
+
+        Returns:
+            Dict of container name -> ContainerDeployment instances that are unhealthy
+        """
+        from ..filters.container import ContainerFilterOptions
+
+        filters = ContainerFilterOptions(health_status=["unhealthy"])
+        return self.find_containers(filters)
+
+    def get_containers_by_resource_usage(
+        self,
+        cpu_threshold: Optional[float] = None,
+        memory_threshold: Optional[float] = None,
+        replica_threshold: Optional[float] = None,
+    ) -> dict[str, ContainerDeployment]:
+        """
+        Find containers exceeding resource thresholds.
+
+        Args:
+            cpu_threshold: CPU utilization threshold (0-100)
+            memory_threshold: Memory utilization threshold (0-100)
+            replica_threshold: Replica utilization threshold (0-100)
+
+        Returns:
+            Dict of container name -> ContainerDeployment instances exceeding thresholds
+        """
+        from ..filters.container import ContainerFilterOptions
+
+        thresholds = {}
+        if cpu_threshold is not None:
+            thresholds["cpu"] = cpu_threshold
+        if memory_threshold is not None:
+            thresholds["memory"] = memory_threshold
+        if replica_threshold is not None:
+            thresholds["replica_utilization"] = replica_threshold
+
+        if not thresholds:
+            return {}
+
+        filters = ContainerFilterOptions(resource_thresholds=thresholds)
+        return self.find_containers(filters)
+
+    def count_containers(
+        self, filters: Optional["ContainerFilterOptions"] = None
+    ) -> int:
+        """
+        Count containers within this deployment matching the specified filters.
+
+        Args:
+            filters: ContainerFilterOptions instance with filtering criteria
+
+        Returns:
+            Number of containers matching the filter criteria
+        """
+        return len(self.find_containers(filters))
