@@ -1,4 +1,10 @@
-"""Container filtering utilities for cpln-py."""
+"""Container filtering utilities for cpln-py.
+
+This module provides comprehensive container filtering capabilities:
+- Phase 1: Basic filtering with standard options
+- Phase 2: Advanced filtering with query parsing and enhanced features
+- Phase 3: Integration features with caching, monitoring, and CLI support
+"""
 
 from .container import ContainerFilterOptions
 from .enhanced import (
@@ -12,6 +18,14 @@ from .enhanced import (
     SortOrder,
     create_advanced_filter,
     create_cross_workload_discovery,
+)
+from .integration import (
+    CLIIntegration,
+    FilterCache,
+    FilterMetrics,
+    IntegratedContainerFilter,
+    create_production_filter,
+    quick_filter,
 )
 from .query_parser import (
     AdvancedQueryParser,
@@ -41,4 +55,11 @@ __all__ = [
     "CrossWorkloadContainerDiscovery",
     "create_advanced_filter",
     "create_cross_workload_discovery",
+    # Phase 3 - Integration features
+    "IntegratedContainerFilter",
+    "CLIIntegration",
+    "FilterMetrics",
+    "FilterCache",
+    "quick_filter",
+    "create_production_filter",
 ]
