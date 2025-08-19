@@ -1,5 +1,6 @@
+import copy
 import random
-from typing import Optional
+from typing import Any, Optional, cast
 
 import inflection
 
@@ -17,7 +18,7 @@ class Workload(Model):
     A workload on the server.
     """
 
-    def get(self) -> dict[str, any]:
+    def get(self) -> dict[str, Any]:
         """
         Get the workload.
 
@@ -55,7 +56,14 @@ class Workload(Model):
         Raises:
             APIError: If the request fails
         """
-        return self.client.api.get_workload_deployment(self.config(location=location))
+        deployment_data = self.client.api.get_workload_deployment(
+            self.config(location=location)
+        )
+        return Deployment.parse(
+            deployment_data,
+            api_client=cast(Any, self.client.api),
+            config=self.config(location=location),
+        )
 
     def delete(self) -> None:
         """
@@ -189,7 +197,7 @@ class Workload(Model):
         location: Optional[str] = None,
         container: Optional[str] = None,
         replica_selector: Optional[int] = None,
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         """
         Ping the workload.
 
@@ -220,7 +228,7 @@ class Workload(Model):
         except Exception as e:
             return {"status": 500, "message": str(e), "exit_code": -1}
 
-    def export(self) -> dict[str, any]:
+    def export(self) -> dict[str, Any]:
         """
         Export the workload.
         """
@@ -294,6 +302,291 @@ class Workload(Model):
         """
         containers = self.get_containers()
         return next(filter(lambda c: c.name == container_name, containers), None)
+
+    def update(
+        self,
+        description: Optional[str] = None,
+        image: Optional[str] = None,
+        container_name: Optional[str] = None,
+        workload_type: Optional[str] = None,
+        replicas: Optional[int] = None,
+        cpu: Optional[str] = None,
+        memory: Optional[str] = None,
+        environment_variables: Optional[dict[str, str]] = None,
+        metadata_file_path: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        spec: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """
+        Update the workload with the provided parameters.
+
+        This method supports both specific parameter updates and full spec updates.
+        It performs validation before sending the update to the API and supports
+        partial updates by merging with the existing workload specification.
+
+        Args:
+            description (Optional[str]): New description for the workload
+            image (Optional[str]): New container image. If provided, container_name should also be specified
+            container_name (Optional[str]): Name of container to update the image for
+            workload_type (Optional[str]): New workload type ("serverless" or "standard")
+            replicas (Optional[int]): Number of replicas for scaling
+            cpu (Optional[str]): CPU resource specification (e.g., "100m", "1")
+            memory (Optional[str]): Memory resource specification (e.g., "128Mi", "1Gi")
+            environment_variables (Optional[Dict[str, str]]): Environment variables to update/add
+            metadata_file_path (Optional[str]): Path to JSON file containing full metadata
+            metadata (Optional[Dict[str, Any]]): Full metadata dictionary for complete replacement
+            spec (Optional[Dict[str, Any]]): Workload spec dictionary for spec-only updates
+
+        Returns:
+            None: Updates return immediately without waiting for deployment completion
+
+        Raises:
+            ValueError: If validation fails or invalid parameters are provided
+            RuntimeError: If the API call fails
+
+        Examples:
+            # Update container image
+            workload.update(image="nginx:1.21", container_name="web")
+
+            # Scale workload
+            workload.update(replicas=5)
+
+            # Update resources
+            workload.update(cpu="500m", memory="1Gi")
+
+            # Update environment variables (merges with existing)
+            workload.update(environment_variables={"NEW_VAR": "value"})
+
+            # Full spec update
+            workload.update(spec={"containers": [...], "defaultOptions": {...}})
+        """
+        # Validate mutually exclusive options
+        exclusive_options = [metadata_file_path, metadata, spec]
+        provided_exclusive = [opt for opt in exclusive_options if opt is not None]
+
+        if len(provided_exclusive) > 1:
+            raise ValueError(
+                "Only one of metadata_file_path, metadata, or spec can be provided"
+            )
+
+        # Validate container_name when image is provided
+        if image is not None and container_name is None:
+            # Try to auto-detect container name if only one container exists
+            containers = self.get_containers()
+            if len(containers) == 1:
+                container_name = containers[0].name
+            else:
+                raise ValueError(
+                    "container_name must be specified when image is provided "
+                    "and workload has multiple containers"
+                )
+
+        # Validate workload_type
+        if workload_type is not None and workload_type not in [
+            "serverless",
+            "standard",
+            "job",
+        ]:
+            raise ValueError("workload_type must be 'serverless', 'standard', or 'job'")
+
+        # Validate replicas
+        if replicas is not None and replicas < 0:
+            raise ValueError("replicas must be non-negative")
+
+        # Validate resource specifications
+        if cpu is not None:
+            self._validate_cpu_spec(cpu)
+        if memory is not None:
+            self._validate_memory_spec(memory)
+
+        # Build update data based on provided parameters
+        try:
+            if metadata_file_path is not None:
+                # Load from file
+                update_data = load_template(metadata_file_path)
+            elif metadata is not None:
+                # Use provided metadata (full replacement)
+                update_data = copy.deepcopy(metadata)
+            elif spec is not None:
+                # Use provided spec (spec-only update)
+                update_data = {"spec": copy.deepcopy(spec)}
+            else:
+                # Build update from individual parameters
+                update_data = self._build_update_from_parameters(
+                    description=description,
+                    image=image,
+                    container_name=container_name,
+                    workload_type=workload_type,
+                    replicas=replicas,
+                    cpu=cpu,
+                    memory=memory,
+                    environment_variables=environment_variables,
+                )
+
+            # Apply the update via API
+            response = self.client.api.patch_workload(
+                config=self.config(),
+                data=update_data,
+            )
+
+            # Handle response
+            if response.status_code // 100 == 2:
+                print(f"✅ Workload '{self.name}' updated successfully")
+                print(f"   Status: {response.status_code}")
+                # Note: You can call self.reload() to refresh workload data from server
+            else:
+                error_msg = f"API call failed with status {response.status_code}"
+                try:
+                    error_detail = response.json()
+                    print(f"❌ Update failed: {error_detail}")
+                    error_msg += f": {error_detail}"
+                except Exception:
+                    print(f"❌ Update failed: {response.text}")
+                    error_msg += f": {response.text}"
+                raise RuntimeError(error_msg)
+
+        except Exception as e:
+            print(f"❌ Failed to update workload '{self.name}': {e}")
+            raise
+
+    def _validate_cpu_spec(self, cpu: str) -> None:
+        """
+        Validate CPU resource specification.
+
+        Args:
+            cpu (str): CPU specification to validate
+
+        Raises:
+            ValueError: If CPU specification is invalid
+        """
+        import re
+
+        # Match patterns like "100m", "1", "1.5", "2000m"
+        cpu_pattern = r"^(\d+(\.\d+)?)(m)?$"
+        if not re.match(cpu_pattern, cpu):
+            raise ValueError(
+                f"Invalid CPU specification '{cpu}'. "
+                "Expected format: number optionally followed by 'm' (e.g., '100m', '1', '1.5')"
+            )
+
+    def _validate_memory_spec(self, memory: str) -> None:
+        """
+        Validate memory resource specification.
+
+        Args:
+            memory (str): Memory specification to validate
+
+        Raises:
+            ValueError: If memory specification is invalid
+        """
+        import re
+
+        # Match patterns like "128Mi", "1Gi", "500M", "2G"
+        memory_pattern = r"^(\d+(\.\d+)?)(Mi|Gi|M|G|Ki|K|Ti|T)?$"
+        if not re.match(memory_pattern, memory):
+            raise ValueError(
+                f"Invalid memory specification '{memory}'. "
+                "Expected format: number followed by unit (e.g., '128Mi', '1Gi', '500M')"
+            )
+
+    def _build_update_from_parameters(
+        self,
+        description: Optional[str] = None,
+        image: Optional[str] = None,
+        container_name: Optional[str] = None,
+        workload_type: Optional[str] = None,
+        replicas: Optional[int] = None,
+        cpu: Optional[str] = None,
+        memory: Optional[str] = None,
+        environment_variables: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
+        """
+        Build update data structure from individual parameters.
+
+        This method creates a partial update structure that merges with existing
+        workload configuration rather than replacing it entirely.
+
+        Args:
+            Individual update parameters
+
+        Returns:
+            Dict[str, Any]: Update data structure for the API
+        """
+        update_data = {}
+
+        # Update description
+        if description is not None:
+            update_data["description"] = description
+
+        # Build spec updates
+        spec_updates = {}
+
+        # Update workload type
+        if workload_type is not None:
+            spec_updates["type"] = workload_type
+
+        # Update container-related settings
+        if any([image, cpu, memory, environment_variables]):
+            containers_update = []
+
+            # Get current containers to merge updates
+            current_containers = self.get_containers()
+
+            for container in current_containers:
+                container_update = {
+                    "name": container.name,
+                    "image": container.image,
+                }
+
+                # Update image for specified container
+                if image is not None and container.name == container_name:
+                    container_update["image"] = image
+
+                # Update resources
+                if cpu is not None or memory is not None:
+                    resources = {}
+                    if cpu is not None:
+                        resources["cpu"] = cpu
+                    if memory is not None:
+                        resources["memory"] = memory
+                    container_update["resources"] = resources
+
+                # Update environment variables (merge with existing)
+                if environment_variables is not None:
+                    # Get current env vars
+                    current_env = getattr(container, "env", []) or []
+                    env_dict = {
+                        env.get("name"): env.get("value")
+                        for env in current_env
+                        if isinstance(env, dict)
+                    }
+
+                    # Merge with new env vars
+                    env_dict.update(environment_variables)
+
+                    # Convert back to list format
+                    env_list = [{"name": k, "value": v} for k, v in env_dict.items()]
+                    container_update["env"] = env_list
+
+                containers_update.append(container_update)
+
+            if containers_update:
+                spec_updates["containers"] = containers_update
+
+        # Update scaling (replicas)
+        if replicas is not None:
+            if "defaultOptions" not in spec_updates:
+                spec_updates["defaultOptions"] = {}
+            if "autoscaling" not in spec_updates["defaultOptions"]:
+                spec_updates["defaultOptions"]["autoscaling"] = {}
+            spec_updates["defaultOptions"]["autoscaling"]["minScale"] = replicas
+            spec_updates["defaultOptions"]["autoscaling"]["maxScale"] = replicas
+
+        # Add spec updates to main update data
+        if spec_updates:
+            update_data["spec"] = spec_updates
+
+        return update_data
 
     def _change_suspend_state(self, state: bool = True) -> None:
         output = self.client.api.patch_workload(
