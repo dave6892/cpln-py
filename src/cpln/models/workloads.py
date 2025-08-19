@@ -1,5 +1,5 @@
 import random
-from typing import Optional
+from typing import Any, Optional, cast
 
 import inflection
 
@@ -17,7 +17,7 @@ class Workload(Model):
     A workload on the server.
     """
 
-    def get(self) -> dict[str, any]:
+    def get(self) -> dict[str, Any]:
         """
         Get the workload.
 
@@ -55,7 +55,14 @@ class Workload(Model):
         Raises:
             APIError: If the request fails
         """
-        return self.client.api.get_workload_deployment(self.config(location=location))
+        deployment_data = self.client.api.get_workload_deployment(
+            self.config(location=location)
+        )
+        return Deployment.parse(
+            deployment_data,
+            api_client=cast(Any, self.client.api),
+            config=self.config(location=location),
+        )
 
     def delete(self) -> None:
         """
