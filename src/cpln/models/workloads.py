@@ -209,7 +209,7 @@ class Workload(Model):
         """
         try:
             self.exec(
-                ["echo", "ping"],
+                "echo ping",
                 location=location,
                 container=container,
                 replica_selector=replica_selector,
@@ -461,12 +461,13 @@ class Workload(Model):
         """
         import re
 
-        # Match patterns like "100m", "1", "1.5", "2000m"
-        cpu_pattern = r"^(\d+(\.\d+)?)(m)?$"
+        # Match patterns like "100m", "1", "1.5", "2000m" but NOT bare integers like "100"
+        # Valid: single digit integers ("1", "2"), decimal numbers ("1.5", "0.5"), or any integer with 'm' suffix ("100m", "2000m")
+        cpu_pattern = r"^(\d\.\d+|\d+\.\d+|\d+m|[0-9])$"
         if not re.match(cpu_pattern, cpu):
             raise ValueError(
                 f"Invalid CPU specification '{cpu}'. "
-                "Expected format: number optionally followed by 'm' (e.g., '100m', '1', '1.5')"
+                "Expected format: decimal number (e.g., '1', '1.5') or integer with 'm' suffix (e.g., '100m', '2000m')"
             )
 
     def _validate_memory_spec(self, memory: str) -> None:

@@ -115,17 +115,19 @@ class TestWorkload(unittest.TestCase):
         container: str = "app"
         expected_response: dict[str, str] = {"output": "Hello, World!"}
 
-        # Mock the API method to return a deployment with replicas
+        # Mock the deployment and replica directly
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
         mock_replica.exec.return_value = expected_response
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        result = self.workload.exec(command, location, container=container)
+        # Mock Deployment.parse to return the mock deployment directly
+        with patch(
+            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        ):
+            result = self.workload.exec(command, location, container=container)
 
         self.assertEqual(result, expected_response)
-        self.client.api.get_workload_deployment.assert_called_once()
         mock_deployment.get_replicas.assert_called_once()
         mock_replica.exec.assert_called_once_with(command)
 
@@ -139,21 +141,22 @@ class TestWorkload(unittest.TestCase):
         error = WebSocketExitCodeError("Command failed")
         error.exit_code = 1
 
-        # Mock the API method to return a deployment with replicas
+        # Mock the deployment and replica directly
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
         mock_replica.exec.side_effect = error
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
         # Mock print to avoid output during test
         with (
             patch("builtins.print"),
+            patch(
+                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+            ),
             self.assertRaises(WebSocketExitCodeError),
         ):
             self.workload.exec(command, location, container=container)
 
-        self.client.api.get_workload_deployment.assert_called_once()
         mock_deployment.get_replicas.assert_called_once()
         mock_replica.exec.assert_called_once_with(command)
 
@@ -162,14 +165,16 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         container: str = "app"
 
-        # Mock the API method to return a deployment with replicas
+        # Mock the deployment and replica directly
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
         mock_replica.exec.return_value = {"output": "ping"}
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        result = self.workload.ping(location, container=container)
+        with patch(
+            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        ):
+            result = self.workload.ping(location, container=container)
 
         self.assertEqual(result["status"], 200)
         self.assertEqual(result["message"], "Successfully pinged workload")
@@ -184,14 +189,16 @@ class TestWorkload(unittest.TestCase):
         error = WebSocketExitCodeError("Command failed")
         error.exit_code = 1
 
-        # Mock the API method to return a deployment with replicas
+        # Mock the deployment and replica directly
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
         mock_replica.exec.side_effect = error
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        result = self.workload.ping(location, container=container)
+        with patch(
+            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        ):
+            result = self.workload.ping(location, container=container)
 
         self.assertEqual(result["status"], 500)
         self.assertIn("Command failed with exit code", result["message"])
@@ -202,14 +209,16 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         container: str = "app"
 
-        # Mock the API method to raise a general exception
+        # Mock the deployment and replica directly
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
         mock_replica.exec.side_effect = RuntimeError("General error")
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        result = self.workload.ping(location, container=container)
+        with patch(
+            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        ):
+            result = self.workload.ping(location, container=container)
 
         self.assertEqual(result["status"], 500)
         self.assertEqual(result["message"], "General error")
@@ -221,12 +230,16 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         container: str = "app"
 
-        # Mock the API method to return a deployment with no replicas
+        # Mock the deployment to return no replicas
         mock_deployment = MagicMock()
         mock_deployment.get_replicas.return_value = {}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        with self.assertRaises(ValueError) as context:
+        with (
+            patch(
+                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+            ),
+            self.assertRaises(ValueError) as context,
+        ):
             self.workload.exec(command, location, container=container)
 
         self.assertIn("No replicas found", str(context.exception))
@@ -237,12 +250,16 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         container: str = "nonexistent-container"
 
-        # Mock the API method to return a deployment with different containers
+        # Mock the deployment to return different containers
         mock_deployment = MagicMock()
         mock_deployment.get_replicas.return_value = {"other-container": []}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        with self.assertRaises(ValueError) as context:
+        with (
+            patch(
+                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+            ),
+            self.assertRaises(ValueError) as context,
+        ):
             self.workload.exec(command, location, container=container)
 
         self.assertIn(
@@ -304,14 +321,16 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         container: str = "app"
 
-        # Mock the API method to return a deployment with replicas
+        # Mock the deployment and replica directly
         mock_deployment = MagicMock()
         mock_replica = MagicMock()
         mock_replica.exec.side_effect = Exception("Connection failed")
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        result = self.workload.ping(location, container=container)
+        with patch(
+            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        ):
+            result = self.workload.ping(location, container=container)
 
         self.assertEqual(result["status"], 500)
         self.assertEqual(result["message"], "Connection failed")

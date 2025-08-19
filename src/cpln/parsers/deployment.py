@@ -167,10 +167,16 @@ class Internal(BaseParser):
         ksvc_status (dict[str, Any]): Knative service status information
     """
 
-    pod_status: dict[str, Any]
-    pods_valid_zone: bool
-    timestamp: str
-    ksvc_status: dict[str, Any]
+    pod_status: dict[str, Any] = None
+    pods_valid_zone: bool = False
+    timestamp: str = ""
+    ksvc_status: dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.pod_status is None:
+            self.pod_status = {}
+        if self.ksvc_status is None:
+            self.ksvc_status = {}
 
 
 @dataclass
