@@ -168,6 +168,20 @@ class TestInternal:
         assert internal.timestamp == "2023-01-01T00:00:00Z"
         assert internal.ksvc_status == {"ready": True}
 
+    def test_post_init_with_none_values(self):
+        """Test that __post_init__ properly initializes None values to empty dicts."""
+        internal = Internal(
+            pod_status=None,
+            pods_valid_zone=False,
+            timestamp="",
+            ksvc_status=None,
+        )
+        # __post_init__ should have converted None values to empty dicts
+        assert internal.pod_status == {}
+        assert internal.ksvc_status == {}
+        assert internal.pods_valid_zone is False
+        assert internal.timestamp == ""
+
 
 class TestStatus:
     def test_parse_with_internal_and_versions(self):
@@ -575,3 +589,63 @@ class TestDeployment:
         result = deployment.get_containers()
         expected = {"container1": container1, "container2": container2}
         assert result == expected
+
+    def test_get_replicas(self):
+        """Test get_replicas method which was missing coverage."""
+        # Create a real deployment without mocking __post_init__
+        # to ensure line 382 (the return statement) gets coverage
+
+        # Mock the required methods
+        status_mock = Mock()
+        status_mock.remote = "https://remote.example.com"
+
+        deployment = Deployment(
+            name="test",
+            status=status_mock,
+            last_modified="2023-01-01T00:00:00Z",
+            kind="Deployment",
+            links=[],
+            api_client=self.api_client,
+            config=self.workload_config,
+        )
+
+        # Mock the helper methods
+        deployment.get_remote_deployment = Mock(
+            return_value={"items": ["replica1", "replica2"]}
+        )
+        deployment.get_containers = Mock(
+            return_value={"container1": Mock(), "container2": Mock()}
+        )
+        deployment.get_remote_wss = Mock(return_value="wss://remote.example.com/remote")
+
+        # Call get_replicas to cover line 382
+        with patch("cpln.parsers.deployment.WorkloadReplica.parse") as mock_parse:
+            mock_parse.return_value = Mock()
+            result = deployment.get_replicas()
+
+            # Verify the structure is correct
+            assert isinstance(result, dict)
+            assert "container1" in result
+            assert "container2" in result
+
+    def test_real_post_init_coverage(self):
+        """Test the actual __post_init__ method without mocking to ensure line 346 is covered."""
+        status_mock = Mock()
+        status_mock.remote = "https://remote.example.com"
+
+        # Create deployment normally (without mocking __post_init__)
+        # This will execute the real __post_init__ method and cover line 346
+        deployment = Deployment(
+            name="test",
+            status=status_mock,
+            last_modified="2023-01-01T00:00:00Z",
+            kind="Deployment",
+            links=[],
+            api_client=self.api_client,
+            config=self.workload_config,
+        )
+
+        # Verify deployment was created successfully
+        assert deployment.name == "test"
+        assert deployment.api_client == self.api_client
+        assert deployment.config == self.workload_config
