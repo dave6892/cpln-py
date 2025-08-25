@@ -807,19 +807,6 @@ class TestWorkload(unittest.TestCase):
 
         self.assertEqual(config.gvc, custom_gvc)
 
-    # def test_get_containers(self) -> None:
-    #     """Test get_containers method"""
-    #     location: str = "test-location"
-    #     expected_containers: List[str] = ["container1", "container2"]
-    #     self.client.api.get_containers.return_value = expected_containers
-
-    #     result = self.workload.get_containers(location)
-
-    #     self.assertEqual(result, expected_containers)
-    #     self.client.api.get_containers.assert_called_once_with(
-    #         self.workload.config(location=location)
-    #     )
-
     def test_clone_basic(self) -> None:
         """Test clone method with basic parameters"""
         # Setup test data
