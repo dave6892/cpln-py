@@ -385,9 +385,11 @@ class Workload(Model):
         if workload_type is not None and workload_type not in [
             "serverless",
             "standard",
-            "job",
+            "cron",
         ]:
-            raise ValueError("workload_type must be 'serverless', 'standard', or 'job'")
+            raise ValueError(
+                "workload_type must be 'serverless', 'standard', or 'cron'"
+            )
 
         # Validate replicas
         if replicas is not None and replicas < 0:
