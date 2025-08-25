@@ -271,14 +271,17 @@ class TestWorkload(unittest.TestCase):
         location: str = "test-location"
         expected_replicas = ["replica1", "replica2"]
 
-        # Mock the API method
+        # Mock the deployment to return expected replicas
         mock_deployment = MagicMock()
         mock_deployment.get_replicas.return_value = expected_replicas
-        self.client.api.get_workload_deployment.return_value = mock_deployment
 
-        result = self.workload.get_replicas(location)
+        with patch(
+            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        ):
+            result = self.workload.get_replicas(location)
 
         self.assertEqual(result, expected_replicas)
+        # Verify the API was called with correct config
         self.client.api.get_workload_deployment.assert_called_once_with(
             self.workload.config(location=location)
         )
@@ -553,7 +556,7 @@ class TestWorkload(unittest.TestCase):
         update_data = call_args[1]["data"]
         self.assertEqual(update_data, new_metadata)
 
-    @patch("cpln.utils.load_template")
+    @patch("cpln.models.workloads.load_template")
     def test_update_with_metadata_file_success(self, mock_load_template) -> None:
         """Test update method with metadata file path"""
         metadata_file_path = "/path/to/metadata.json"
@@ -612,13 +615,20 @@ class TestWorkload(unittest.TestCase):
         mock_containers[0].name = "web"
         mock_containers[1].name = "worker"
 
-        with (
-            patch.object(self.workload, "get_containers", return_value=mock_containers),
-            self.assertRaises(ValueError) as context,
-        ):
-            self.workload.update(image="nginx:1.22")
+        # Make sure the API is never called by raising an exception if it is
+        self.client.api.patch_workload.side_effect = Exception(
+            "API should not be called"
+        )
 
-        self.assertIn("container_name must be specified", str(context.exception))
+        # Use a different patching approach - patch the actual method that's being called internally
+        with patch(
+            "cpln.models.workloads.Workload.get_containers",
+            return_value=mock_containers,
+        ):
+            with self.assertRaises(ValueError) as context:
+                self.workload.update(image="nginx:1.22")
+
+            self.assertIn("container_name must be specified", str(context.exception))
 
     def test_update_validation_invalid_workload_type(self) -> None:
         """Test update method validation for invalid workload type"""

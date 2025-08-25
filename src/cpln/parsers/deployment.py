@@ -209,8 +209,20 @@ class Status(BaseParser):
     def parse(cls, data: dict[str, Any]) -> Any:
         internal = data.pop("internal")
         versions = data.pop("versions")
+        endpoint = data.pop("endpoint")
+        remote = data.pop("remote")
+        last_processed_version = data.pop("lastProcessedVersion")
+        expected_deployment_version = data.pop("expectedDeploymentVersion")
+        message = data.pop("message")
+        ready = data.pop("ready")
+
         return cls(
-            **cls.format_key_of_dict(data),
+            endpoint=endpoint,
+            remote=remote,
+            last_processed_version=last_processed_version,
+            expected_deployment_version=expected_deployment_version,
+            message=message,
+            ready=ready,
             internal=Internal.parse(internal),
             versions=[Version.parse(version) for version in versions],
         )
