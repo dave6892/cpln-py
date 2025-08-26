@@ -34,7 +34,7 @@ def kwargs_from_env(environment=None):
         CPLN_TOKEN: Authorization token for the CPLN API
         CPLN_ORG: Organization name in CPLN
     """
-    if not environment:
+    if environment is None:
         environment = os.environ
 
     base_url = DEFAULT_CPLN_API_URL
