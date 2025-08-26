@@ -4,10 +4,9 @@ Example script demonstrating how to work with GVCs (Global Virtual Clusters) usi
 """
 
 import sys
-from typing import List
 
 import cpln
-from cpln.exceptions import CPLNError
+from cpln.errors import CPLNError
 from cpln.models.gvcs import GVC
 from utils import safe_get_attr
 
@@ -34,7 +33,7 @@ def get_cpln_client() -> cpln.CPLNClient:
         raise
 
 
-def list_gvcs(client: cpln.CPLNClient) -> List[GVC]:
+def list_gvcs(client: cpln.CPLNClient) -> list[GVC]:
     """
     List all GVCs in the organization.
 

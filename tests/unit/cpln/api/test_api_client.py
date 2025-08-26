@@ -3,7 +3,8 @@ from unittest.mock import Mock
 
 import pytest
 from cpln.api.client import APIClient
-from cpln.errors import APIError, NotFound
+from cpln.errors import APIError
+from cpln.exceptions import NotFound
 
 
 def test_api_client_initialization(mock_config):

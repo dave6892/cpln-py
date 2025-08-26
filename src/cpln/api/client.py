@@ -1,8 +1,9 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import requests
 
-from ..errors import APIError, NotFound
+from ..errors import APIError
+from ..exceptions import NotFound
 from .config import APIConfig
 from .gvc import GVCApiMixin
 from .image import ImageApiMixin
@@ -46,7 +47,7 @@ class APIClient(
 
         self.config = config
 
-    def _get(self, endpoint: str) -> Dict[str, Any]:
+    def _get(self, endpoint: str) -> dict[str, Any]:
         """
         Makes a GET request to the specified API endpoint.
 
@@ -95,7 +96,7 @@ class APIClient(
         return resp
 
     def _post(
-        self, endpoint: str, data: Optional[Dict[str, Any]] = None
+        self, endpoint: str, data: Optional[dict[str, Any]] = None
     ) -> requests.Response:
         """
         Makes a POST request to the specified API endpoint.
@@ -133,7 +134,7 @@ class APIClient(
         return resp
 
     def _patch(
-        self, endpoint: str, data: Optional[Dict[str, Any]] = None
+        self, endpoint: str, data: Optional[dict[str, Any]] = None
     ) -> requests.Response:
         """
         Makes a PATCH request to the specified API endpoint.

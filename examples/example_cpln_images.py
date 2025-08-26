@@ -4,10 +4,9 @@ Example script demonstrating how to work with Images using the CPLN Python clien
 """
 
 import sys
-from typing import List
 
 import cpln
-from cpln.exceptions import CPLNError
+from cpln.errors import CPLNError
 from cpln.models.gvcs import GVC
 from cpln.models.images import Image
 from utils import safe_get_attr
@@ -56,7 +55,7 @@ def get_gvc(client: cpln.CPLNClient, gvc_name: str) -> GVC:
         raise
 
 
-def list_images(client: cpln.CPLNClient) -> List[Image]:
+def list_images(client: cpln.CPLNClient) -> list[Image]:
     """
     List all images.
 
@@ -97,7 +96,7 @@ def get_image_details(client: cpln.CPLNClient, image_name: str) -> Image:
         raise
 
 
-def filter_images_by_repository(images: List[Image], repository: str) -> List[Image]:
+def filter_images_by_repository(images: list[Image], repository: str) -> list[Image]:
     """
     Filter images by repository name.
 

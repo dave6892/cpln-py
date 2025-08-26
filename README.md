@@ -283,7 +283,8 @@ client.workloads.create(
 ### Error Handling
 
 ```python
-from cpln.errors import APIError, NotFound, WebSocketExitCodeError
+from cpln.errors import APIError, WebSocketExitCodeError
+from cpln.exceptions import NotFound
 
 try:
     # API operations

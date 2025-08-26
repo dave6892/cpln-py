@@ -6,6 +6,13 @@ from unittest.mock import Mock
 from cpln.errors import (
     APIError,
     BuildError,
+    WebSocketConnectionError,
+    WebSocketError,
+    WebSocketExitCodeError,
+    WebSocketMessageError,
+    WebSocketOperationError,
+)
+from cpln.exceptions import (
     ContextException,
     ContextNotFound,
     CPLNException,
@@ -19,11 +26,6 @@ from cpln.errors import (
     MissingContextParameter,
     NotFound,
     NullResource,
-    WebSocketConnectionError,
-    WebSocketError,
-    WebSocketExitCodeError,
-    WebSocketMessageError,
-    WebSocketOperationError,
 )
 
 

@@ -6,7 +6,7 @@ Example script demonstrating how to list and inspect workloads using the CPLN Py
 import sys
 
 import cpln
-from cpln.exceptions import CPLNError
+from cpln.errors import CPLNError
 from cpln.models.workloads import Workload
 
 
@@ -89,7 +89,7 @@ def main() -> None:
                 print(f"Containers: {len(containers)}")
 
                 for i, container in enumerate(containers):
-                    print(f"  Container {i+1}: {container.name}")
+                    print(f"  Container {i + 1}: {container.name}")
                     print(f"    Image: {container.image}")
                     print(f"    CPU: {container.cpu}")
                     print(f"    Memory: {container.memory}")
