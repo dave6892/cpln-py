@@ -88,17 +88,26 @@ class WebSocketAPI:
             exit_code = 0
 
             # Check for non-zero exit code
-            if "exit code" in decoded_message.lower():
+            has_exit_code = "exit code" in decoded_message.lower()
+            parsed_exit_code_successfully = False
+            if has_exit_code:
                 try:
-                    exit_code = decoded_message.split("exit code")[-1].strip()
-                    exit_code = int(exit_code)
+                    exit_code_str = decoded_message.split("exit code")[-1].strip()
+                    exit_code = int(exit_code_str)
+                    parsed_exit_code_successfully = True
                 except ValueError:
-                    pass
+                    # If exit code parsing fails, treat as success (exit code 0) and don't set error
+                    exit_code = 0
+                    parsed_exit_code_successfully = False
 
-            if exit_code != 0:
+            # Only process exit code errors if we successfully parsed a non-zero exit code
+            if exit_code != 0 and parsed_exit_code_successfully:
                 command = self._request.get("command", [])
                 if isinstance(command, list):
                     command = command[0] if command else ""
+
+                error_type = None
+                error_message = None
 
                 if command == "aws":
                     if AwsExitCode.is_error(exit_code):
@@ -113,26 +122,36 @@ class WebSocketAPI:
                         error_type = GenericExitCode.get_error_type(exit_code)
                         error_message = GenericExitCode.get_message(exit_code)
 
-                self._error = WebSocketExitCodeError(
-                    f"{error_type if error_type else 'Error'} (exit code {exit_code}): {error_message}\n"
-                    f"Full message: {decoded_message}"
-                )
+                # Only set error if we have error information from the handlers
+                if error_type and error_message:
+                    self._error = WebSocketExitCodeError(
+                        f"{error_type} (exit code {exit_code}): {error_message}\n"
+                        f"Full message: {decoded_message}"
+                    )
+                else:
+                    # Fallback error for unhandled exit codes
+                    self._error = WebSocketExitCodeError(
+                        f"Error (exit code {exit_code}): Unknown exit code: {exit_code}\n"
+                        f"Full message: {decoded_message}"
+                    )
 
                 return exit_code
 
-            # Check for error messages
-            if "error" in decoded_message.lower():
-                self._error = WebSocketOperationError(
-                    f"Error in message: {decoded_message}"
-                )
-                return
+            # Only check for error/failed keywords if message doesn't contain exit code
+            if not has_exit_code:
+                # Check for error messages
+                if "error" in decoded_message.lower():
+                    self._error = WebSocketOperationError(
+                        f"Error in message: {decoded_message}"
+                    )
+                    return
 
-            # Check for failure messages
-            if "failed" in decoded_message.lower():
-                self._error = WebSocketOperationError(
-                    f"Operation failed: {decoded_message}"
-                )
-                return
+                # Check for failure messages
+                if "failed" in decoded_message.lower():
+                    self._error = WebSocketOperationError(
+                        f"Operation failed: {decoded_message}"
+                    )
+                    return
 
             print(decoded_message)
             return exit_code
