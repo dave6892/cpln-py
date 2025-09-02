@@ -121,9 +121,11 @@ class TestWorkload(unittest.TestCase):
         mock_replica.exec.return_value = expected_response
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
 
-        # Mock Deployment.parse to return the mock deployment directly
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        # Mock API to return the mock deployment directly
+        with patch.object(
+            self.client.api,
+            "get_workload_deployment",
+            return_value=mock_deployment,
         ):
             result = self.workload.exec(command, location, container=container)
 
@@ -150,8 +152,10 @@ class TestWorkload(unittest.TestCase):
         # Mock print to avoid output during test
         with (
             patch("builtins.print"),
-            patch(
-                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+            patch.object(
+                self.client.api,
+                "get_workload_deployment",
+                return_value=mock_deployment,
             ),
             self.assertRaises(WebSocketExitCodeError),
         ):
@@ -171,8 +175,10 @@ class TestWorkload(unittest.TestCase):
         mock_replica.exec.return_value = {"output": "ping"}
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
 
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        with patch.object(
+            self.client.api,
+            "get_workload_deployment",
+            return_value=mock_deployment,
         ):
             result = self.workload.ping(location, container=container)
 
@@ -195,8 +201,10 @@ class TestWorkload(unittest.TestCase):
         mock_replica.exec.side_effect = error
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
 
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        with patch.object(
+            self.client.api,
+            "get_workload_deployment",
+            return_value=mock_deployment,
         ):
             result = self.workload.ping(location, container=container)
 
@@ -215,8 +223,10 @@ class TestWorkload(unittest.TestCase):
         mock_replica.exec.side_effect = RuntimeError("General error")
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
 
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        with patch.object(
+            self.client.api,
+            "get_workload_deployment",
+            return_value=mock_deployment,
         ):
             result = self.workload.ping(location, container=container)
 
@@ -235,8 +245,10 @@ class TestWorkload(unittest.TestCase):
         mock_deployment.get_replicas.return_value = {}
 
         with (
-            patch(
-                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+            patch.object(
+                self.client.api,
+                "get_workload_deployment",
+                return_value=mock_deployment,
             ),
             self.assertRaises(ValueError) as context,
         ):
@@ -255,8 +267,10 @@ class TestWorkload(unittest.TestCase):
         mock_deployment.get_replicas.return_value = {"other-container": []}
 
         with (
-            patch(
-                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+            patch.object(
+                self.client.api,
+                "get_workload_deployment",
+                return_value=mock_deployment,
             ),
             self.assertRaises(ValueError) as context,
         ):
@@ -276,15 +290,14 @@ class TestWorkload(unittest.TestCase):
         mock_deployment.get_replicas.return_value = expected_replicas
 
         with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
+            "cpln.models.workloads.Workload.get_deployment",
+            return_value=mock_deployment,
+        ) as mock_get_deployment:
             result = self.workload.get_replicas(location)
 
         self.assertEqual(result, expected_replicas)
-        # Verify the API was called with correct config
-        self.client.api.get_workload_deployment.assert_called_once_with(
-            self.workload.config(location=location)
-        )
+        # Verify get_deployment was called with correct location
+        mock_get_deployment.assert_called_once_with(location=location)
 
     def test_get_containers(self) -> None:
         """Test get_containers method"""
@@ -330,8 +343,10 @@ class TestWorkload(unittest.TestCase):
         mock_replica.exec.side_effect = Exception("Connection failed")
         mock_deployment.get_replicas.return_value = {container: [mock_replica]}
 
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
+        with patch.object(
+            self.client.api,
+            "get_workload_deployment",
+            return_value=mock_deployment,
         ):
             result = self.workload.ping(location, container=container)
 

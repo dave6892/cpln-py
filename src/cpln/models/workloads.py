@@ -1,6 +1,6 @@
 import copy
 import random
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import inflection
 
@@ -59,11 +59,7 @@ class Workload(Model):
         deployment_data = self.client.api.get_workload_deployment(
             self.config(location=location)
         )
-        return Deployment.parse(
-            deployment_data,
-            api_client=cast(Any, self.client.api),
-            config=self.config(location=location),
-        )
+        return deployment_data
 
     def delete(self) -> None:
         """
