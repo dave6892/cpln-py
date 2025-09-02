@@ -33,13 +33,8 @@ class WorkloadDeploymentMixin:
 
         endpoint = f"gvc/{config.gvc}/workload/{config.workload_id}/deployment"
 
-        print(f"Debug: config = {config}")
-        print(f"Debug: client = {self.__dict__}")
-
         if config.location:
             endpoint += f"/{config.location}"
-
-        print(f"Debug: endpoint = {endpoint}")
 
         # Type cast to indicate parent class has _get method
         deployment_data_raw = cast(Any, self)._get(endpoint)
