@@ -1,5 +1,6 @@
 from typing import (
     Any,
+    cast,
 )
 
 from ..config import WorkloadConfig
@@ -40,21 +41,22 @@ class WorkloadDeploymentMixin:
 
         print(f"Debug: endpoint = {endpoint}")
 
-        deployment_data_raw = self._get(endpoint)
+        # Type cast to indicate parent class has _get method
+        deployment_data_raw = cast(Any, self)._get(endpoint)
 
         deployment_data = deployment_data_raw.get("items", None)
         if deployment_data:
             return {
                 deployment["name"]: Deployment.parse(
                     deployment,
-                    api_client=self,
+                    api_client=cast(Any, self),
                     config=config,
                 )
                 for deployment in deployment_data
             }
         return Deployment.parse(
             deployment_data_raw,
-            api_client=self,
+            api_client=cast(Any, self),
             config=config,
         )
 
@@ -80,7 +82,7 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
         endpoint = f"gvc/{config.gvc}/workload"
         if config.workload_id:
             endpoint += f"/{config.workload_id}"
-        return self._get(endpoint)
+        return cast(Any, self)._get(endpoint)
 
     def create_workload(
         self,
@@ -101,7 +103,7 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
             APIError: If the request fails
         """
         endpoint = f"gvc/{config.gvc}/workload"
-        return self._post(endpoint, data=metadata)
+        return cast(Any, self)._post(endpoint, data=metadata)
 
     def delete_workload(self, config: WorkloadConfig):
         """
@@ -117,7 +119,7 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
             APIError: If the request fails
         """
         endpoint = f"gvc/{config.gvc}/workload/{config.workload_id}"
-        return self._delete(endpoint)
+        return cast(Any, self)._delete(endpoint)
 
     def patch_workload(self, config: WorkloadConfig, data: dict[str, Any]):
         """
@@ -134,4 +136,4 @@ class WorkloadApiMixin(WorkloadDeploymentMixin):
             APIError: If the request fails
         """
         endpoint = f"gvc/{config.gvc}/workload/{config.workload_id}"
-        return self._patch(endpoint, data=data)
+        return cast(Any, self)._patch(endpoint, data=data)
