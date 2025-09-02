@@ -27,6 +27,16 @@ class ContainerDeploymentResources(BaseParser):
     replicas: int
     replicas_ready: int
 
+    @classmethod
+    @preparse
+    def parse(cls, data: dict[str, Any]) -> Any:
+        # For suspended workloads, replicas_ready might be missing from the API response
+        # In that case, default to 0 since no replicas are ready when suspended
+        if "replicas_ready" not in data and "replicasReady" not in data:
+            data["replicas_ready"] = 0
+
+        return cls(**cls.format_key_of_dict(data))
+
 
 @dataclass
 class ContainerDeployment(BaseParser):
@@ -48,6 +58,12 @@ class ContainerDeployment(BaseParser):
     @preparse
     def parse(cls, data: dict[str, Any]) -> Any:
         resources = data.pop("resources")
+
+        # For suspended workloads, message might be missing from the API response
+        # In that case, default to empty string since there's no status message
+        if "message" not in data:
+            data["message"] = ""
+
         return cls(
             **cls.format_key_of_dict(data),
             resources=ContainerDeploymentResources.parse(resources),
@@ -133,17 +149,21 @@ class Version(BaseParser):
 
     Attributes:
         message (str): Status message for this version
+        name (str): Version name identifier
         ready (bool): Whether this version is ready
         containers (list[ContainerDeployment]): List of container deployments
         created (str): Creation timestamp
         workload (int): The workload version number
+        zone (str): Deployment zone
     """
 
     message: str
+    name: str
     ready: bool
     containers: list[ContainerDeployment]
     created: str
     workload: int  # this is the workload version number
+    zone: str
 
     @classmethod
     @preparse
@@ -152,6 +172,16 @@ class Version(BaseParser):
         containers_list = [
             ContainerDeployment.parse(container) for _, container in containers.items()
         ]
+
+        # For suspended workloads, name and zone might be missing from the API response
+        # In that case, provide default values
+        if "name" not in data:
+            workload_version = data.get("workload", 0)
+            data["name"] = f"version-{workload_version}"
+
+        if "zone" not in data:
+            data["zone"] = ""
+
         return cls(**cls.format_key_of_dict(data), containers=containers_list)
 
 
