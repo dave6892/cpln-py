@@ -40,6 +40,7 @@ class WorkloadDeploymentMixin:
         deployment_data_raw = cast(Any, self)._get(endpoint)
 
         deployment_data = deployment_data_raw.get("items", None)
+        print(deployment_data)
         if deployment_data:
             return {
                 deployment["name"]: Deployment.parse(
