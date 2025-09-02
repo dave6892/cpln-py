@@ -85,10 +85,7 @@ class ContainerDeployment(BaseParser):
         ]
 
         message_lower = self.message.lower() if self.message else ""
-        if any(keyword in message_lower for keyword in error_keywords):
-            return False
-
-        return True
+        return not any(keyword in message_lower for keyword in error_keywords)
 
     def get_resource_utilization(self) -> dict[str, Optional[float]]:
         """

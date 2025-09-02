@@ -1,14 +1,16 @@
+# ruff: noqa: I001
 import os
+from collections.abc import Generator
 from pathlib import Path
-from typing import Dict, Generator
 from unittest.mock import MagicMock, Mock, patch
 
+from dotenv import load_dotenv
 import pytest
 import requests
+
 from cpln import CPLNClient
 from cpln.api.client import APIClient
 from cpln.api.config import APIConfig
-from dotenv import load_dotenv
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
@@ -18,7 +20,7 @@ load_dotenv(env_path)
 @pytest.fixture(autouse=True)
 def mock_env_vars() -> Generator[None, None, None]:
     # Only override if not set in .env
-    env_vars: Dict[str, str] = {
+    env_vars: dict[str, str] = {
         "CPLN_TOKEN": os.getenv("CPLN_TOKEN", "test-token"),
         "CPLN_ORG": os.getenv("CPLN_ORG", "test-org"),
         "CPLN_BASE_URL": os.getenv("CPLN_BASE_URL", "https://api.cpln.io"),

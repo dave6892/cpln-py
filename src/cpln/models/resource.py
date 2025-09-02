@@ -69,9 +69,13 @@ class Model:
             super().__setattr__(name, value)
         else:
             # If attrs hasn't been initialized yet, initialize it
-            if not hasattr(self, "attrs"):
-                self.attrs = {}
-            self.attrs[name] = value
+            try:
+                attrs_dict = object.__getattribute__(self, "attrs")
+            except AttributeError:
+                attrs_dict = {}
+                object.__setattr__(self, "attrs", attrs_dict)
+
+            attrs_dict[name] = value
 
     def __delattr__(self, name):
         """
@@ -158,12 +162,18 @@ class Collection:
         """
         Create a model from a set of attributes.
         """
+        # Normalize state to empty dict if None
+        if state is None:
+            state = {}
+
         if isinstance(attrs, Model):
             attrs.client = self.client
             attrs.collection = self
             attrs.state = state
             return attrs
         elif isinstance(attrs, dict):
+            if self.model is None:
+                raise ValueError(f"Can't create Model from {attrs}")
             return self.model(
                 attrs=attrs, client=self.client, collection=self, state=state
             )

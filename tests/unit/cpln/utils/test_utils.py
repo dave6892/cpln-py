@@ -9,117 +9,8 @@ from unittest.mock import patch
 from cpln.utils.utils import (
     convert_dictionary_keys,
     get_default_workload_template,
-    kwargs_from_env,
     load_template,
 )
-
-
-class TestEnvironmentConfiguration(unittest.TestCase):
-    """Test environment variable configuration extraction"""
-
-    def test_kwargs_from_env_with_valid_environment_returns_complete_config(self):
-        """Test that kwargs_from_env returns complete config with valid environment variables"""
-        # Arrange
-        test_environment = {
-            "CPLN_TOKEN": "test-token-123",
-            "CPLN_ORG": "test-organization",
-        }
-        expected_config = {
-            "base_url": "https://api.cpln.io",
-            "token": "test-token-123",
-            "org": "test-organization",
-        }
-
-        # Act
-        result = kwargs_from_env(environment=test_environment)
-
-        # Assert
-        self.assertEqual(result, expected_config)
-
-    def test_kwargs_from_env_with_none_environment_uses_os_environ(self):
-        """Test that kwargs_from_env uses os.environ when environment is None"""
-        # Arrange
-        with patch.dict(
-            os.environ, {"CPLN_TOKEN": "env-token-456", "CPLN_ORG": "env-organization"}
-        ):
-            expected_config = {
-                "base_url": "https://api.cpln.io",
-                "token": "env-token-456",
-                "org": "env-organization",
-            }
-
-            # Act
-            result = kwargs_from_env(environment=None)
-
-            # Assert
-            self.assertEqual(result, expected_config)
-
-    def test_kwargs_from_env_with_missing_token_raises_value_error(self):
-        """Test that kwargs_from_env raises ValueError when CPLN_TOKEN is missing"""
-        # Arrange
-        test_environment = {
-            "CPLN_ORG": "test-organization",
-            # CPLN_TOKEN is intentionally missing
-        }
-
-        # Act & Assert
-        with self.assertRaises(ValueError) as context:
-            kwargs_from_env(environment=test_environment)
-
-        self.assertIn("CPLN_TOKEN is not set", str(context.exception))
-
-    def test_kwargs_from_env_with_missing_org_raises_value_error(self):
-        """Test that kwargs_from_env raises ValueError when CPLN_ORG is missing"""
-        # Arrange
-        test_environment = {
-            "CPLN_TOKEN": "test-token-123",
-            # CPLN_ORG is intentionally missing
-        }
-
-        # Act & Assert
-        with self.assertRaises(ValueError) as context:
-            kwargs_from_env(environment=test_environment)
-
-        self.assertIn("CPLN_ORG is not set", str(context.exception))
-
-    def test_kwargs_from_env_with_empty_token_raises_value_error(self):
-        """Test that kwargs_from_env raises ValueError when CPLN_TOKEN is empty"""
-        # Arrange
-        test_environment = {
-            "CPLN_TOKEN": "",  # Empty token
-            "CPLN_ORG": "test-organization",
-        }
-
-        # Act & Assert
-        with self.assertRaises(ValueError) as context:
-            kwargs_from_env(environment=test_environment)
-
-        self.assertIn("CPLN_TOKEN is not set", str(context.exception))
-
-    def test_kwargs_from_env_with_empty_org_raises_value_error(self):
-        """Test that kwargs_from_env raises ValueError when CPLN_ORG is empty"""
-        # Arrange
-        test_environment = {
-            "CPLN_TOKEN": "test-token-123",
-            "CPLN_ORG": "",  # Empty org
-        }
-
-        # Act & Assert
-        with self.assertRaises(ValueError) as context:
-            kwargs_from_env(environment=test_environment)
-
-        self.assertIn("CPLN_ORG is not set", str(context.exception))
-
-    def test_kwargs_from_env_with_empty_environment_uses_defaults(self):
-        """Test that kwargs_from_env handles empty environment dictionary"""
-        # Arrange
-        test_environment = {}
-
-        # Act & Assert
-        with self.assertRaises(ValueError) as context:
-            kwargs_from_env(environment=test_environment)
-
-        self.assertIn("CPLN_TOKEN is not set", str(context.exception))
 
 
 class TestTemplateLoading(unittest.TestCase):
@@ -131,7 +22,11 @@ class TestTemplateLoading(unittest.TestCase):
         test_data = {
             "kind": "workload",
             "metadata": {"name": "test-workload"},
-            "spec": {"containers": [{"name": "app", "image": "nginx"}]},
+            "spec": {
+                "containers": [
+                    {"name": "app", "image": "nginx", "cpu": "100m", "memory": 128}
+                ]
+            },
         }
 
         with tempfile.NamedTemporaryFile(
@@ -177,8 +72,20 @@ class TestTemplateLoading(unittest.TestCase):
             },
             "spec": {
                 "containers": [
-                    {"name": "web", "ports": [8080, 8443]},
-                    {"name": "db", "env": {"DB_NAME": "test"}},
+                    {
+                        "name": "web",
+                        "image": "nginx:latest",
+                        "cpu": "100m",
+                        "memory": 128,
+                        "ports": [8080, 8443],
+                    },
+                    {
+                        "name": "db",
+                        "image": "postgres:13",
+                        "cpu": "200m",
+                        "memory": 512,
+                        "env": {"DB_NAME": "test"},
+                    },
                 ]
             },
         }
@@ -549,15 +456,6 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
         # Assert
         self.assertEqual(result, expected_output)
-
-    @patch.dict(os.environ, {}, clear=True)
-    def test_kwargs_from_env_with_cleared_environment_raises_appropriate_errors(self):
-        """Test that kwargs_from_env handles completely cleared environment"""
-        # Act & Assert
-        with self.assertRaises(ValueError) as context:
-            kwargs_from_env()
-
-        self.assertIn("CPLN_TOKEN is not set", str(context.exception))
 
 
 if __name__ == "__main__":

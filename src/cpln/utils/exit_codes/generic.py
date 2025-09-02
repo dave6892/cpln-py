@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 
 class GenericExitCode(Enum):
@@ -16,7 +16,7 @@ class GenericExitCode(Enum):
     @classmethod
     def get_message(cls, code: int) -> str:
         """Get the human-readable message for an exit code."""
-        messages: Dict[int, str] = {
+        messages: dict[int, str] = {
             cls.SUCCESS.value: "The command completed successfully.",
             cls.GENERAL_ERROR.value: "An error occurred while executing the command.",
             cls.INVALID_ARGUMENTS.value: "Invalid arguments were provided to the command.",
@@ -35,7 +35,7 @@ class GenericExitCode(Enum):
     @classmethod
     def get_error_type(cls, code: int) -> Optional[str]:
         """Get the type of error for an exit code."""
-        error_types: Dict[int, str] = {
+        error_types: dict[int, str] = {
             cls.GENERAL_ERROR.value: "General Error",
             cls.INVALID_ARGUMENTS.value: "Invalid Arguments",
             cls.PERMISSION_DENIED.value: "Permission Denied",

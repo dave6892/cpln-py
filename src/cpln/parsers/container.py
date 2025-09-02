@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from .base import BaseParser, preparse
@@ -38,12 +38,12 @@ class Container(BaseParser):
         readiness_probe (Optional[Dict[str, Any]]): Readiness probe configuration
     """
 
-    cpu: str
     name: str
     image: str
-    ports: list[ContainerPort]
+    cpu: str
     memory: int
-    inherit_env: bool
+    ports: list[ContainerPort] = field(default_factory=list)
+    inherit_env: bool = False
     env: Optional[dict[str, Any]] = None
     volumes: Optional[list[dict[str, Any]]] = None
     liveness_probe: Optional[dict[str, Any]] = None
@@ -51,7 +51,7 @@ class Container(BaseParser):
 
     @classmethod
     @preparse
-    def parse(cls, data: dict[str, Any]) -> Any:
+    def parse(cls, data: dict[str, Any]) -> Any:  # type: ignore
         """
         Parse raw API data into a Container instance.
 
@@ -61,7 +61,7 @@ class Container(BaseParser):
         Returns:
             Container: A parsed Container instance
         """
-        ports = data.pop("ports")
+        ports = data.pop("ports", [])
         return cls(
             **cls.format_key_of_dict(data),
             ports=[ContainerPort.parse(port) for port in ports],

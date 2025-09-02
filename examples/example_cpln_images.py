@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: I001
 """
 Example script demonstrating how to work with Images using the CPLN Python client.
 """

@@ -1,20 +1,23 @@
+"""Tests for Workload models following unit testing best practices."""
+
 import unittest
-from typing import Any, cast
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, call, patch
 
 from cpln.config import WorkloadConfig
 from cpln.errors import WebSocketExitCodeError
 from cpln.models.workloads import Workload, WorkloadCollection
-from requests import Response
+from cpln.parsers.container import Container
+from cpln.parsers.deployment import Deployment
+from cpln.parsers.spec import Spec
 
 
-class TestWorkload(unittest.TestCase):
-    """Tests for the Workload class"""
+class TestWorkloadInitialization(unittest.TestCase):
+    """Test Workload model initialization and basic properties"""
 
-    def setUp(self) -> None:
-        """Set up the test"""
-        self.attrs: dict[str, Any] = {
-            "id": "test-workload-id",
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.basic_attrs = {
+            "id": "wl-123456",
             "name": "test-workload",
             "description": "Test workload description",
             "spec": {
@@ -24,1269 +27,818 @@ class TestWorkload(unittest.TestCase):
                         "image": "nginx:latest",
                         "cpu": "100m",
                         "memory": 128,
-                        "ports": [{"number": 80, "protocol": "http"}],
-                        "inheritEnv": False,
                     }
                 ],
-                "defaultOptions": {
-                    "suspend": False,
-                    "debug": False,
-                    "timeoutSeconds": 30,
-                    "capacityAI": True,
-                    "autoscaling": {
-                        "metric": "memory",
-                        "target": 70,
-                        "minScale": 1,
-                        "maxScale": 5,
-                        "maxConcurrency": 100,
-                        "scaleToZeroDelay": 300,
-                    },
-                    "multiZone": {"enabled": True},
-                },
                 "type": "standard",
-                "loadBalancer": {"direct": {}, "replicaDirect": False},
-                "firewallConfig": {"external": {}, "internal": {}},
             },
         }
-        self.client: MagicMock = MagicMock()
-        self.collection: MagicMock = MagicMock()
-        self.state: dict[str, str] = {"gvc": "test-gvc"}
-        self.workload = Workload(
-            attrs=self.attrs,
-            client=self.client,
-            collection=self.collection,
-            state=self.state,
+
+    def test_workload_initialization_with_all_parameters_sets_attributes_correctly(
+        self,
+    ):
+        """Test that Workload initializes correctly with all parameters"""
+        # Arrange
+        test_client = MagicMock()
+        test_collection = MagicMock()
+        test_state = {"deployment": "active"}
+
+        # Act
+        workload = Workload(
+            attrs=self.basic_attrs,
+            client=test_client,
+            collection=test_collection,
+            state=test_state,
         )
 
-    def test_initialization(self) -> None:
-        """Test workload initialization"""
-        self.assertEqual(self.workload.attrs, self.attrs)
-        self.assertEqual(self.workload.client, self.client)
-        self.assertEqual(self.workload.collection, self.collection)
-        self.assertEqual(self.workload.state, self.state)
-        # The string representation includes the class name and workload name
-        self.assertTrue("Workload" in str(self.workload))
-        self.assertTrue("test-workload" in str(self.workload))
+        # Assert
+        self.assertEqual(workload.attrs, self.basic_attrs)
+        self.assertEqual(workload.client, test_client)
+        self.assertEqual(workload.collection, test_collection)
+        self.assertEqual(workload.state, test_state)
 
-    def test_get(self) -> None:
-        """Test get method"""
-        expected_response: dict[str, Any] = {"name": "test-workload", "updated": True}
-        self.client.api.get_workload.return_value = expected_response
+    def test_workload_initialization_with_minimal_parameters_uses_defaults(self):
+        """Test that Workload initializes correctly with minimal parameters"""
+        # Act
+        workload = Workload()
 
-        result = self.workload.get()
+        # Assert
+        self.assertEqual(workload.attrs, {})
+        self.assertIsNone(workload.client)
+        self.assertIsNone(workload.collection)
+        self.assertEqual(workload.state, {})
 
-        self.assertEqual(result, expected_response)
-        self.client.api.get_workload.assert_called_once_with(self.workload.config())
+    def test_workload_inherits_model_properties_correctly(self):
+        """Test that Workload inherits Model base class properties"""
+        # Arrange
+        workload = Workload(attrs=self.basic_attrs)
 
-    def test_delete(self) -> None:
-        """Test delete method"""
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
+        # Act & Assert
+        self.assertEqual(workload.id, "wl-123456")
+        self.assertEqual(workload.name, "test-workload")
+        self.assertEqual(workload.short_id, "wl-123456")  # Less than 12 chars
+        self.assertEqual(workload.label, "test-workload")
+
+
+class TestWorkloadBasicOperations(unittest.TestCase):
+    """Test basic Workload CRUD operations"""
+
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {
+            "name": "api-workload",
+            "id": "wl-api-789",
+            "spec": {
+                "containers": [
+                    {
+                        "name": "web",
+                        "image": "nginx:alpine",
+                        "cpu": "100m",
+                        "memory": 128,
+                    }
+                ],
+                "type": "serverless",
+            },
+        }
+        self.mock_client = MagicMock()
+        self.mock_collection = MagicMock()
+        self.workload = Workload(
+            attrs=self.test_attrs,
+            client=self.mock_client,
+            collection=self.mock_collection,
+        )
+
+    def test_get_operation_calls_client_api_with_workload_config(self):
+        """Test that get() calls the client API with correct workload configuration"""
+        # Arrange
+        expected_response = {"name": "api-workload", "status": "active"}
+        self.mock_client.api.get_workload.return_value = expected_response
+
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
+
+            # Act
+            result = self.workload.get()
+
+            # Assert
+            self.assertEqual(result, expected_response)
+            mock_config.assert_called_once_with()
+            self.mock_client.api.get_workload.assert_called_once_with(
+                mock_config.return_value
+            )
+
+    @patch("builtins.print")
+    def test_delete_operation_calls_client_api_and_prints_messages(self, mock_print):
+        """Test that delete() calls client API and prints appropriate messages"""
+        # Arrange
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
+
+            # Act
             self.workload.delete()
 
-        self.client.api.delete_workload.assert_called_once_with(self.workload.config())
+            # Assert
+            mock_config.assert_called_once_with()
+            self.mock_client.api.delete_workload.assert_called_once_with(
+                mock_config.return_value
+            )
+            # Verify print statements were called
+            expected_calls = [
+                call(f"Deleting Workload: {self.workload}"),
+                call("Deleted!"),
+            ]
+            mock_print.assert_has_calls(expected_calls)
 
-    def test_suspend(self) -> None:
-        """Test suspend method"""
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
+    def test_config_method_returns_workload_config_instance(self):
+        """Test that config() method returns properly configured WorkloadConfig"""
+        # Act
+        result = self.workload.config()
+
+        # Assert
+        self.assertIsInstance(result, WorkloadConfig)
+        # Verify config was created with correct workload name
+        self.assertEqual(result.workload_id, "api-workload")
+
+    def test_config_method_with_location_parameter_includes_location(self):
+        """Test that config() method includes location when provided"""
+        # Act
+        result = self.workload.config(location="us-west-2")
+
+        # Assert
+        self.assertIsInstance(result, WorkloadConfig)
+        self.assertEqual(result.workload_id, "api-workload")
+        self.assertEqual(result.location, "us-west-2")
+
+
+class TestWorkloadSpecAndDeploymentOperations(unittest.TestCase):
+    """Test Workload spec and deployment-related operations"""
+
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {
+            "name": "spec-workload",
+            "spec": {
+                "containers": [
+                    {
+                        "name": "web",
+                        "image": "nginx:latest",
+                        "cpu": "500m",
+                        "memory": 512,
+                    }
+                ],
+                "type": "standard",
+                "defaultOptions": {"suspend": False},
+            },
+        }
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
+
+    @patch("cpln.models.workloads.Spec.parse")
+    def test_get_spec_returns_parsed_spec_object(self, mock_spec_parse):
+        """Test that get_spec() returns parsed Spec object from attrs"""
+        # Arrange
+        mock_spec = MagicMock(spec=Spec)
+        mock_spec_parse.return_value = mock_spec
+
+        # Act
+        result = self.workload.get_spec()
+
+        # Assert
+        self.assertEqual(result, mock_spec)
+        mock_spec_parse.assert_called_once_with(self.test_attrs["spec"])
+
+    @patch("cpln.models.workloads.Deployment.parse")
+    def test_get_deployment_returns_parsed_deployment_object(
+        self, mock_deployment_parse
+    ):
+        """Test that get_deployment() returns parsed Deployment object"""
+        # Arrange
+        mock_deployment_data = {"status": "running", "replicas": 3}
+        self.mock_client.api.get_workload_deployment.return_value = mock_deployment_data
+        mock_deployment = MagicMock(spec=Deployment)
+        mock_deployment_parse.return_value = mock_deployment
+
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
+
+            # Act
+            result = self.workload.get_deployment()
+
+            # Assert
+            self.assertEqual(result, mock_deployment)
+            mock_config.assert_called_once_with(location=None)
+            self.mock_client.api.get_workload_deployment.assert_called_once_with(
+                mock_config.return_value
+            )
+            mock_deployment_parse.assert_called_once_with(
+                mock_deployment_data,
+                api_client=self.mock_client.api,
+                config=mock_config.return_value,
+            )
+
+    @patch("cpln.models.workloads.Deployment.parse")
+    def test_get_deployment_with_location_parameter_passes_location(
+        self, mock_deployment_parse
+    ):
+        """Test that get_deployment() with location parameter passes location correctly"""
+        # Arrange
+        test_location = "eu-central-1"
+        mock_deployment_data = {"status": "running"}
+        self.mock_client.api.get_workload_deployment.return_value = mock_deployment_data
+        mock_deployment = MagicMock(spec=Deployment)
+        mock_deployment_parse.return_value = mock_deployment
+
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
+
+            # Act
+            result = self.workload.get_deployment(location=test_location)
+
+            # Assert
+            self.assertEqual(result, mock_deployment)
+            mock_config.assert_called_once_with(location=test_location)
+
+
+class TestWorkloadSuspendOperations(unittest.TestCase):
+    """Test Workload suspend and unsuspend operations"""
+
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {"name": "suspend-test", "spec": {"type": "standard"}}
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
+
+    def test_suspend_operation_calls_change_suspend_state_with_true(self):
+        """Test that suspend() calls internal _change_suspend_state with True"""
+        # Arrange
+        with patch.object(self.workload, "_change_suspend_state") as mock_change_state:
+            # Act
             self.workload.suspend()
 
-        self.client.api.patch_workload.assert_called_once_with(
-            config=self.workload.config(),
-            data={"spec": {"defaultOptions": {"suspend": "true"}}},
-        )
+            # Assert
+            mock_change_state.assert_called_once_with(True)
 
-    def test_unsuspend(self) -> None:
-        """Test unsuspend method"""
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
+    def test_unsuspend_operation_calls_change_suspend_state_with_false(self):
+        """Test that unsuspend() calls internal _change_suspend_state with False"""
+        # Arrange
+        with patch.object(self.workload, "_change_suspend_state") as mock_change_state:
+            # Act
             self.workload.unsuspend()
 
-        self.client.api.patch_workload.assert_called_once_with(
-            config=self.workload.config(),
-            data={"spec": {"defaultOptions": {"suspend": "false"}}},
-        )
+            # Assert
+            mock_change_state.assert_called_once_with(False)
 
-    def test_exec_success(self) -> None:
-        """Test exec method with success"""
-        command: str = "echo 'Hello, World!'"
-        location: str = "test-location"
-        container: str = "app"
-        expected_response: dict[str, str] = {"output": "Hello, World!"}
+    @patch("builtins.print")
+    def test_change_suspend_state_with_true_updates_workload_to_suspended(
+        self, mock_print
+    ):
+        """Test that _change_suspend_state(True) updates workload to suspended state"""
+        # Arrange
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
 
-        # Mock the deployment and replica directly
-        mock_deployment = MagicMock()
-        mock_replica = MagicMock()
-        mock_replica.exec.return_value = expected_response
-        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
+            # Act
+            self.workload._change_suspend_state(True)
 
-        # Mock Deployment.parse to return the mock deployment directly
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
-            result = self.workload.exec(command, location, container=container)
+            # Assert
+            mock_config.assert_called_once_with()
+            self.mock_client.api.update_workload.assert_called_once()
+            # Verify the suspend state was set correctly in the update call
+            call_args = self.mock_client.api.update_workload.call_args[0]
+            update_data = call_args[1]
+            self.assertTrue(update_data["spec"]["defaultOptions"]["suspend"])
 
-        self.assertEqual(result, expected_response)
-        mock_deployment.get_replicas.assert_called_once()
-        mock_replica.exec.assert_called_once_with(command)
+    @patch("builtins.print")
+    def test_change_suspend_state_with_false_updates_workload_to_active(
+        self, mock_print
+    ):
+        """Test that _change_suspend_state(False) updates workload to active state"""
+        # Arrange
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
 
-    def test_exec_error(self) -> None:
-        """Test exec method with error"""
-        command: str = "invalid-command"
-        location: str = "test-location"
-        container: str = "app"
+            # Act
+            self.workload._change_suspend_state(False)
 
-        # Create a WebSocketExitCodeError with exit_code
-        error = WebSocketExitCodeError("Command failed")
-        error.exit_code = 1
+            # Assert
+            mock_config.assert_called_once_with()
+            self.mock_client.api.update_workload.assert_called_once()
+            # Verify the suspend state was set correctly in the update call
+            call_args = self.mock_client.api.update_workload.call_args[0]
+            update_data = call_args[1]
+            self.assertFalse(update_data["spec"]["defaultOptions"]["suspend"])
 
-        # Mock the deployment and replica directly
-        mock_deployment = MagicMock()
-        mock_replica = MagicMock()
-        mock_replica.exec.side_effect = error
-        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
 
-        # Mock print to avoid output during test
-        with (
-            patch("builtins.print"),
-            patch(
-                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-            ),
-            self.assertRaises(WebSocketExitCodeError),
-        ):
-            self.workload.exec(command, location, container=container)
+class TestWorkloadContainerOperations(unittest.TestCase):
+    """Test Workload container-related operations"""
 
-        mock_deployment.get_replicas.assert_called_once()
-        mock_replica.exec.assert_called_once_with(command)
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {
+            "name": "container-test",
+            "spec": {
+                "containers": [
+                    {
+                        "name": "web",
+                        "image": "nginx:latest",
+                        "cpu": "200m",
+                        "memory": 256,
+                    },
+                    {
+                        "name": "api",
+                        "image": "python:3.9",
+                        "cpu": "100m",
+                        "memory": 128,
+                    },
+                ]
+            },
+        }
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
 
-    def test_ping_success(self) -> None:
-        """Test ping method with success"""
-        location: str = "test-location"
-        container: str = "app"
+    @patch("cpln.models.workloads.Container")
+    def test_get_containers_returns_list_of_container_objects(
+        self, mock_container_class
+    ):
+        """Test that get_containers() returns list of Container objects"""
+        # Arrange
+        mock_container1 = MagicMock(spec=Container)
+        mock_container2 = MagicMock(spec=Container)
+        mock_container_class.side_effect = [mock_container1, mock_container2]
 
-        # Mock the deployment and replica directly
-        mock_deployment = MagicMock()
-        mock_replica = MagicMock()
-        mock_replica.exec.return_value = {"output": "ping"}
-        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
-            result = self.workload.ping(location, container=container)
-
-        self.assertEqual(result["status"], 200)
-        self.assertEqual(result["message"], "Successfully pinged workload")
-        self.assertEqual(result["exit_code"], 0)
-
-    def test_ping_websocket_error(self) -> None:
-        """Test ping method with WebSocketExitCodeError"""
-        location: str = "test-location"
-        container: str = "app"
-
-        # Create a WebSocketExitCodeError with exit_code
-        error = WebSocketExitCodeError("Command failed")
-        error.exit_code = 1
-
-        # Mock the deployment and replica directly
-        mock_deployment = MagicMock()
-        mock_replica = MagicMock()
-        mock_replica.exec.side_effect = error
-        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
-            result = self.workload.ping(location, container=container)
-
-        self.assertEqual(result["status"], 500)
-        self.assertIn("Command failed with exit code", result["message"])
-        self.assertEqual(result["exit_code"], 1)
-
-    def test_ping_general_exception(self) -> None:
-        """Test ping method with general exception"""
-        location: str = "test-location"
-        container: str = "app"
-
-        # Mock the deployment and replica directly
-        mock_deployment = MagicMock()
-        mock_replica = MagicMock()
-        mock_replica.exec.side_effect = RuntimeError("General error")
-        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
-
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
-            result = self.workload.ping(location, container=container)
-
-        self.assertEqual(result["status"], 500)
-        self.assertEqual(result["message"], "General error")
-        self.assertEqual(result["exit_code"], -1)
-
-    def test_exec_no_replicas(self) -> None:
-        """Test exec method when no replicas are found"""
-        command: str = "echo test"
-        location: str = "test-location"
-        container: str = "app"
-
-        # Mock the deployment to return no replicas
-        mock_deployment = MagicMock()
-        mock_deployment.get_replicas.return_value = {}
-
-        with (
-            patch(
-                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-            ),
-            self.assertRaises(ValueError) as context,
-        ):
-            self.workload.exec(command, location, container=container)
-
-        self.assertIn("No replicas found", str(context.exception))
-
-    def test_exec_container_not_found(self) -> None:
-        """Test exec method when container is not found"""
-        command: str = "echo test"
-        location: str = "test-location"
-        container: str = "nonexistent-container"
-
-        # Mock the deployment to return different containers
-        mock_deployment = MagicMock()
-        mock_deployment.get_replicas.return_value = {"other-container": []}
-
-        with (
-            patch(
-                "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-            ),
-            self.assertRaises(ValueError) as context,
-        ):
-            self.workload.exec(command, location, container=container)
-
-        self.assertIn(
-            "Container nonexistent-container not found", str(context.exception)
-        )
-
-    def test_get_replicas(self) -> None:
-        """Test get_replicas method"""
-        location: str = "test-location"
-        expected_replicas = ["replica1", "replica2"]
-
-        # Mock the deployment to return expected replicas
-        mock_deployment = MagicMock()
-        mock_deployment.get_replicas.return_value = expected_replicas
-
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
-            result = self.workload.get_replicas(location)
-
-        self.assertEqual(result, expected_replicas)
-        # Verify the API was called with correct config
-        self.client.api.get_workload_deployment.assert_called_once_with(
-            self.workload.config(location=location)
-        )
-
-    def test_get_containers(self) -> None:
-        """Test get_containers method"""
-        # The actual method returns containers from the spec, so let's test the real behavior
+        # Act
         result = self.workload.get_containers()
 
-        # Should return a list of Container objects
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 1)  # From our test data
-        self.assertEqual(result[0].name, "app")
-        self.assertEqual(result[0].image, "nginx:latest")
+        # Assert
+        self.assertEqual(result, [mock_container1, mock_container2])
+        self.assertEqual(mock_container_class.call_count, 2)
+        # Verify Container was called with correct container specs
+        mock_container_class.assert_any_call(
+            {"name": "web", "image": "nginx:latest", "cpu": "200m", "memory": 256},
+            self.workload,
+        )
+        mock_container_class.assert_any_call(
+            {"name": "api", "image": "python:3.9", "cpu": "100m", "memory": 128},
+            self.workload,
+        )
 
-    def test_get_container_found(self) -> None:
-        """Test get_container method when container is found"""
-        # Test with the real container from our workload data
-        result = self.workload.get_container("app")
+    @patch("cpln.models.workloads.Container")
+    def test_get_container_returns_specific_container_by_name(
+        self, mock_container_class
+    ):
+        """Test that get_container() returns specific Container by name"""
+        # Arrange
+        mock_container = MagicMock(spec=Container)
+        mock_container_class.return_value = mock_container
 
-        # Should find the container with name "app"
-        self.assertIsNotNone(result)
-        self.assertEqual(result.name, "app")
-        self.assertEqual(result.image, "nginx:latest")
+        # Act
+        result = self.workload.get_container("api")
 
-    def test_get_container_not_found(self) -> None:
-        """Test get_container method when container is not found"""
-        # Mock containers
-        mock_container1 = MagicMock()
-        mock_container1.name = "app"
+        # Assert
+        self.assertEqual(result, mock_container)
+        mock_container_class.assert_called_once_with(
+            {"name": "api", "image": "python:3.9", "cpu": "100m", "memory": 128},
+            self.workload,
+        )
 
-        with patch.object(
-            self.workload, "get_containers", return_value=[mock_container1]
-        ):
-            result = self.workload.get_container("nonexistent")
-            self.assertIsNone(result)
+    def test_get_container_with_nonexistent_name_returns_none(self):
+        """Test that get_container() returns None for nonexistent container name"""
+        # Act
+        result = self.workload.get_container("nonexistent")
 
-    def test_ping_general_exception_original(self) -> None:
-        """Test ping method with general exception"""
-        location: str = "test-location"
-        container: str = "app"
+        # Assert
+        self.assertIsNone(result)
 
-        # Mock the deployment and replica directly
-        mock_deployment = MagicMock()
-        mock_replica = MagicMock()
-        mock_replica.exec.side_effect = Exception("Connection failed")
-        mock_deployment.get_replicas.return_value = {container: [mock_replica]}
+    def test_get_replicas_calls_api_with_correct_config(self):
+        """Test that get_replicas() calls API with correct configuration"""
+        # Arrange
+        mock_replicas = ["replica-1", "replica-2", "replica-3"]
+        self.mock_client.api.get_workload_replicas.return_value = mock_replicas
 
-        with patch(
-            "cpln.models.workloads.Deployment.parse", return_value=mock_deployment
-        ):
-            result = self.workload.ping(location, container=container)
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
 
-        self.assertEqual(result["status"], 500)
-        self.assertEqual(result["message"], "Connection failed")
-        self.assertEqual(result["exit_code"], -1)
+            # Act
+            result = self.workload.get_replicas()
 
-    def test_export(self) -> None:
-        """Test export method"""
-        # Mock the API call directly since export calls self.get() which calls the API
-        expected_workload_data = {
-            "name": self.attrs["name"],
-            "spec": self.attrs["spec"],
-            "description": self.attrs["description"],
+            # Assert
+            self.assertEqual(result, mock_replicas)
+            mock_config.assert_called_once_with(location=None)
+            self.mock_client.api.get_workload_replicas.assert_called_once_with(
+                mock_config.return_value
+            )
+
+    def test_get_replicas_with_location_passes_location_parameter(self):
+        """Test that get_replicas() with location parameter passes it correctly"""
+        # Arrange
+        test_location = "asia-pacific-1"
+        mock_replicas = ["replica-1"]
+        self.mock_client.api.get_workload_replicas.return_value = mock_replicas
+
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
+
+            # Act
+            result = self.workload.get_replicas(location=test_location)
+
+            # Assert
+            self.assertEqual(result, mock_replicas)
+            mock_config.assert_called_once_with(location=test_location)
+
+
+class TestWorkloadExecOperations(unittest.TestCase):
+    """Test Workload exec and ping operations"""
+
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {"name": "exec-test", "spec": {"type": "standard"}}
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
+
+    @patch("cpln.models.workloads.Deployment")
+    def test_exec_operation_calls_deployment_exec_with_correct_parameters(
+        self, mock_deployment_class
+    ):
+        """Test that exec() calls deployment exec with correct parameters"""
+        # Arrange
+        mock_deployment = MagicMock(spec=Deployment)
+        mock_deployment.exec.return_value = {
+            "status": "success",
+            "output": "command output",
         }
 
-        self.client.api.get_workload.return_value = expected_workload_data
+        with patch.object(self.workload, "get_deployment") as mock_get_deployment:
+            mock_get_deployment.return_value = mock_deployment
 
-        result = self.workload.export()
+            # Act
+            result = self.workload.exec(
+                "echo hello", location="us-east-1", container="web"
+            )
 
-        self.assertEqual(result["name"], self.attrs["name"])
-        self.assertEqual(result["gvc"], self.state["gvc"])
-        # The spec gets transformed by the parser, so just check it exists and has basic properties
-        self.assertIn("spec", result)
-        self.assertIn("type", result["spec"])
-        self.assertEqual(result["spec"]["type"], "standard")
+            # Assert
+            self.assertEqual(result, {"status": "success", "output": "command output"})
+            mock_get_deployment.assert_called_once_with(location="us-east-1")
+            mock_deployment.exec.assert_called_once_with(
+                "echo hello",
+                container="web",
+                location="us-east-1",
+                workload="exec-test",
+            )
 
-    def test_config_default(self) -> None:
-        """Test config method with default parameters"""
-        config = self.workload.config()
+    @patch("cpln.models.workloads.Deployment")
+    def test_ping_operation_calls_deployment_ping_with_correct_parameters(
+        self, mock_deployment_class
+    ):
+        """Test that ping() calls deployment ping with correct parameters"""
+        # Arrange
+        mock_deployment = MagicMock(spec=Deployment)
+        mock_deployment.ping.return_value = {"status": "success", "latency": "5ms"}
 
-        self.assertIsInstance(config, WorkloadConfig)
-        self.assertEqual(config.gvc, self.state["gvc"])
-        self.assertEqual(config.workload_id, self.attrs["name"])
-        self.assertIsNone(config.location)
+        with patch.object(self.workload, "get_deployment") as mock_get_deployment:
+            mock_get_deployment.return_value = mock_deployment
 
-    def test_config_with_location(self) -> None:
-        """Test config method with location parameter"""
-        location = "us-east-1"
-        config = self.workload.config(location=location)
+            # Act
+            result = self.workload.ping(location="eu-west-1", container="api")
 
-        self.assertEqual(config.location, location)
-        self.assertEqual(config.gvc, self.state["gvc"])
-        self.assertEqual(config.workload_id, self.attrs["name"])
+            # Assert
+            self.assertEqual(result, {"status": "success", "latency": "5ms"})
+            mock_get_deployment.assert_called_once_with(location="eu-west-1")
+            mock_deployment.ping.assert_called_once_with(
+                container="api", location="eu-west-1", workload="exec-test"
+            )
 
-    # Update method tests
-    def test_update_image_success(self) -> None:
-        """Test update method with image update"""
-        new_image = "nginx:1.21"
-        container_name = "app"
 
-        # Mock successful API response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = "Updated successfully"
-        self.client.api.patch_workload.return_value = mock_response
+class TestWorkloadUpdateOperations(unittest.TestCase):
+    """Test Workload update operations and validation"""
 
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
-            self.workload.update(image=new_image, container_name=container_name)
-
-        # Verify API was called with correct data
-        self.client.api.patch_workload.assert_called_once()
-        call_args = self.client.api.patch_workload.call_args
-        self.assertEqual(call_args[1]["config"], self.workload.config())
-
-        # Check that spec contains the updated image
-        update_data = call_args[1]["data"]
-        self.assertIn("spec", update_data)
-        self.assertIn("containers", update_data["spec"])
-
-        # Find the updated container
-        updated_container = None
-        for container in update_data["spec"]["containers"]:
-            if container["name"] == container_name:
-                updated_container = container
-                break
-
-        self.assertIsNotNone(updated_container)
-        self.assertEqual(updated_container["image"], new_image)
-
-    def test_update_replicas_success(self) -> None:
-        """Test update method with replica scaling"""
-        new_replicas = 3
-
-        # Mock successful API response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(replicas=new_replicas)
-
-        # Verify API was called with scaling data
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-
-        self.assertIn("spec", update_data)
-        self.assertIn("defaultOptions", update_data["spec"])
-        self.assertIn("autoscaling", update_data["spec"]["defaultOptions"])
-
-        autoscaling = update_data["spec"]["defaultOptions"]["autoscaling"]
-        self.assertEqual(autoscaling["minScale"], new_replicas)
-        self.assertEqual(autoscaling["maxScale"], new_replicas)
-
-    def test_update_resources_success(self) -> None:
-        """Test update method with CPU and memory resources"""
-        new_cpu = "500m"
-        new_memory = "1Gi"
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(cpu=new_cpu, memory=new_memory)
-
-        # Verify resources were updated
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-
-        container = update_data["spec"]["containers"][0]
-        self.assertEqual(container["resources"]["cpu"], new_cpu)
-        self.assertEqual(container["resources"]["memory"], new_memory)
-
-    def test_update_environment_variables_success(self) -> None:
-        """Test update method with environment variables"""
-        env_vars = {"NEW_VAR": "value123", "DEBUG": "true"}
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(environment_variables=env_vars)
-
-        # Verify environment variables were updated
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-
-        container = update_data["spec"]["containers"][0]
-        env_list = container["env"]
-
-        # Convert back to dict for easier testing
-        env_dict = {env["name"]: env["value"] for env in env_list}
-        for key, value in env_vars.items():
-            self.assertEqual(env_dict[key], value)
-
-    def test_update_description_success(self) -> None:
-        """Test update method with description update"""
-        new_description = "Updated workload description"
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(description=new_description)
-
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-        self.assertEqual(update_data["description"], new_description)
-
-    def test_update_workload_type_success(self) -> None:
-        """Test update method with workload type change"""
-        new_type = "serverless"
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(workload_type=new_type)
-
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-        self.assertEqual(update_data["spec"]["type"], new_type)
-
-    def test_update_with_spec_success(self) -> None:
-        """Test update method with full spec dictionary"""
-        new_spec = {
-            "type": "job",
-            "containers": [
-                {
-                    "name": "worker",
-                    "image": "busybox:latest",
-                    "command": ["/bin/sh", "-c", "echo hello"],
-                }
-            ],
-        }
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(spec=new_spec)
-
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-        self.assertEqual(update_data["spec"], new_spec)
-
-    def test_update_with_metadata_success(self) -> None:
-        """Test update method with full metadata dictionary"""
-        new_metadata = {
-            "name": "updated-workload",
-            "description": "Updated via metadata",
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {
+            "name": "update-test",
             "spec": {
-                "type": "serverless",
-                "containers": [{"name": "api", "image": "fastapi:latest"}],
+                "containers": [
+                    {
+                        "name": "app",
+                        "image": "nginx:latest",
+                        "cpu": "100m",
+                        "memory": 256,
+                    }
+                ],
+                "type": "standard",
             },
         }
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
+    def test_validate_cpu_spec_with_valid_cpu_values_passes(self):
+        """Test that _validate_cpu_spec accepts valid CPU specifications"""
+        # Arrange
+        valid_cpu_values = ["100m", "0.5", "1", "2", "500m", "1.5"]
 
-        with patch("builtins.print"):
-            self.workload.update(metadata=new_metadata)
+        for cpu_value in valid_cpu_values:
+            with self.subTest(cpu_value=cpu_value):
+                # Act & Assert - should not raise any exception
+                try:
+                    self.workload._validate_cpu_spec(cpu_value)
+                except ValueError:
+                    self.fail(
+                        f"_validate_cpu_spec raised ValueError for valid CPU value: {cpu_value}"
+                    )
 
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-        self.assertEqual(update_data, new_metadata)
+    def test_validate_cpu_spec_with_invalid_cpu_values_raises_value_error(self):
+        """Test that _validate_cpu_spec rejects invalid CPU specifications"""
+        # Arrange
+        invalid_cpu_values = ["invalid", "100", "1.5.5", "-100m", ""]
 
-    @patch("cpln.models.workloads.load_template")
-    def test_update_with_metadata_file_success(self, mock_load_template) -> None:
-        """Test update method with metadata file path"""
-        metadata_file_path = "/path/to/metadata.json"
-        expected_metadata = {
-            "name": "file-loaded-workload",
-            "spec": {"type": "standard"},
+        for cpu_value in invalid_cpu_values:
+            with self.subTest(cpu_value=cpu_value):
+                # Act & Assert
+                with self.assertRaises(ValueError) as context:
+                    self.workload._validate_cpu_spec(cpu_value)
+
+                self.assertIn("Invalid CPU specification", str(context.exception))
+
+    def test_validate_memory_spec_with_valid_memory_values_passes(self):
+        """Test that _validate_memory_spec accepts valid memory specifications"""
+        # Arrange
+        valid_memory_values = [128, 256, 512, 1024, 2048]
+
+        for memory_value in valid_memory_values:
+            with self.subTest(memory_value=memory_value):
+                # Act & Assert - should not raise any exception
+                try:
+                    self.workload._validate_memory_spec(str(memory_value))
+                except ValueError:
+                    self.fail(
+                        f"_validate_memory_spec raised ValueError for valid memory value: {memory_value}"
+                    )
+
+    def test_validate_memory_spec_with_invalid_memory_values_raises_value_error(self):
+        """Test that _validate_memory_spec rejects invalid memory specifications"""
+        # Arrange
+        invalid_memory_values = ["invalid", "-256", "0", "1.5", ""]
+
+        for memory_value in invalid_memory_values:
+            with self.subTest(memory_value=memory_value):
+                # Act & Assert
+                with self.assertRaises(ValueError) as context:
+                    self.workload._validate_memory_spec(memory_value)
+
+                self.assertIn("Invalid memory specification", str(context.exception))
+
+    @patch("builtins.print")
+    def test_update_operation_with_valid_parameters_calls_api_correctly(
+        self, mock_print
+    ):
+        """Test that update() with valid parameters calls API correctly"""
+        # Arrange
+        with patch.object(self.workload, "config") as mock_config, patch.object(
+            self.workload, "_validate_cpu_spec"
+        ) as mock_validate_cpu, patch.object(
+            self.workload, "_validate_memory_spec"
+        ) as mock_validate_memory:
+            mock_config.return_value = MagicMock()
+
+            # Act
+            self.workload.update(image="nginx:1.21", cpu="200m", memory="512")
+
+            # Assert
+            mock_validate_cpu.assert_called_once_with("200m")
+            mock_validate_memory.assert_called_once_with("512")
+            mock_config.assert_called_once_with()
+            self.mock_client.api.update_workload.assert_called_once()
+
+
+class TestWorkloadCloneAndExport(unittest.TestCase):
+    """Test Workload clone and export operations"""
+
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {
+            "name": "source-workload",
+            "spec": {
+                "containers": [
+                    {
+                        "name": "app",
+                        "image": "nginx:latest",
+                        "cpu": "100m",
+                        "memory": 256,
+                    }
+                ],
+                "type": "serverless",
+            },
+            "metadata": {"description": "Source workload for cloning"},
         }
-
-        mock_load_template.return_value = expected_metadata
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(metadata_file_path=metadata_file_path)
-
-        mock_load_template.assert_called_once_with(metadata_file_path)
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-        self.assertEqual(update_data, expected_metadata)
-
-    def test_update_validation_mutually_exclusive_options(self) -> None:
-        """Test update method validation for mutually exclusive options"""
-        with self.assertRaises(ValueError) as context:
-            self.workload.update(
-                metadata={"test": "data"},
-                spec={"type": "serverless"},
-                metadata_file_path="/path/file.json",
-            )
-
-        self.assertIn(
-            "Only one of metadata_file_path, metadata, or spec", str(context.exception)
-        )
-
-    def test_update_validation_image_without_container_name_single_container(
-        self,
-    ) -> None:
-        """Test update method auto-detects container name for single container workload"""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            # Should work fine since we have only one container
-            self.workload.update(image="nginx:1.22")
-
-        # Should have called the API successfully
-        self.client.api.patch_workload.assert_called_once()
-
-    def test_update_validation_image_without_container_name_multiple_containers(
-        self,
-    ) -> None:
-        """Test update method validation when image is provided without container_name for multi-container workload"""
-        # Mock multiple containers
-        mock_containers = [MagicMock(), MagicMock()]
-        mock_containers[0].name = "web"
-        mock_containers[1].name = "worker"
-
-        # Make sure the API is never called by raising an exception if it is
-        self.client.api.patch_workload.side_effect = Exception(
-            "API should not be called"
-        )
-
-        # Use a different patching approach - patch the actual method that's being called internally
-        with patch(
-            "cpln.models.workloads.Workload.get_containers",
-            return_value=mock_containers,
-        ):
-            with self.assertRaises(ValueError) as context:
-                self.workload.update(image="nginx:1.22")
-
-            self.assertIn("container_name must be specified", str(context.exception))
-
-    def test_update_validation_invalid_workload_type(self) -> None:
-        """Test update method validation for invalid workload type"""
-        with self.assertRaises(ValueError) as context:
-            self.workload.update(workload_type="invalid_type")
-
-        self.assertIn("workload_type must be", str(context.exception))
-
-    def test_update_validation_negative_replicas(self) -> None:
-        """Test update method validation for negative replicas"""
-        with self.assertRaises(ValueError) as context:
-            self.workload.update(replicas=-1)
-
-        self.assertIn("replicas must be non-negative", str(context.exception))
-
-    def test_update_validation_invalid_cpu_spec(self) -> None:
-        """Test update method validation for invalid CPU specification"""
-        with self.assertRaises(ValueError) as context:
-            self.workload.update(cpu="invalid_cpu")
-
-        self.assertIn("Invalid CPU specification", str(context.exception))
-
-    def test_update_validation_invalid_memory_spec(self) -> None:
-        """Test update method validation for invalid memory specification"""
-        with self.assertRaises(ValueError) as context:
-            self.workload.update(memory="invalid_memory")
-
-        self.assertIn("Invalid memory specification", str(context.exception))
-
-    def test_update_cpu_validation_patterns(self) -> None:
-        """Test CPU validation accepts valid patterns"""
-        valid_cpus = ["100m", "1", "1.5", "2000m", "0.5"]
-
-        for cpu in valid_cpus:
-            # Should not raise exception
-            try:
-                self.workload._validate_cpu_spec(cpu)
-            except ValueError:
-                self.fail(f"Valid CPU spec '{cpu}' was rejected")
-
-        # Test invalid patterns
-        invalid_cpus = ["100", "1.5x", "m100", ""]
-
-        for cpu in invalid_cpus:
-            with self.assertRaises(ValueError):
-                self.workload._validate_cpu_spec(cpu)
-
-    def test_update_memory_validation_patterns(self) -> None:
-        """Test memory validation accepts valid patterns"""
-        valid_memory = [
-            "128Mi",
-            "1Gi",
-            "500M",
-            "2G",
-            "1024Ki",
-            "1K",
-            "1Ti",
-            "1T",
-            "256",
-        ]
-
-        for memory in valid_memory:
-            # Should not raise exception
-            try:
-                self.workload._validate_memory_spec(memory)
-            except ValueError:
-                self.fail(f"Valid memory spec '{memory}' was rejected")
-
-        # Test invalid patterns
-        invalid_memory = ["128X", "Gi128", "", "1.5.5Gi"]
-
-        for memory in invalid_memory:
-            with self.assertRaises(ValueError):
-                self.workload._validate_memory_spec(memory)
-
-    def test_update_api_failure(self) -> None:
-        """Test update method handles API failure"""
-        # Mock API failure response
-        mock_response = MagicMock()
-        mock_response.status_code = 400
-        mock_response.json.return_value = {"error": "Invalid request"}
-        self.client.api.patch_workload.return_value = mock_response
-
-        with (
-            patch("builtins.print"),
-            self.assertRaises(RuntimeError) as context,
-        ):
-            self.workload.update(replicas=3)
-
-        self.assertIn("API call failed with status 400", str(context.exception))
-
-    def test_update_api_failure_no_json(self) -> None:
-        """Test update method handles API failure without JSON response"""
-        # Mock API failure response without JSON
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.json.side_effect = Exception("No JSON")
-        mock_response.text = "Internal server error"
-        self.client.api.patch_workload.return_value = mock_response
-
-        with (
-            patch("builtins.print"),
-            self.assertRaises(RuntimeError) as context,
-        ):
-            self.workload.update(replicas=3)
-
-        self.assertIn("API call failed with status 500", str(context.exception))
-        self.assertIn("Internal server error", str(context.exception))
-
-    def test_update_combined_parameters(self) -> None:
-        """Test update method with multiple parameters combined"""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update(
-                description="Updated workload",
-                image="nginx:1.21",
-                container_name="app",
-                replicas=2,
-                cpu="200m",
-                memory="512Mi",
-                environment_variables={"ENV": "prod"},
-                workload_type="serverless",
-            )
-
-        # Verify all updates were included
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-
-        # Check description
-        self.assertEqual(update_data["description"], "Updated workload")
-
-        # Check spec updates
-        spec = update_data["spec"]
-        self.assertEqual(spec["type"], "serverless")
-
-        # Check container updates
-        container = spec["containers"][0]
-        self.assertEqual(container["image"], "nginx:1.21")
-        self.assertEqual(container["resources"]["cpu"], "200m")
-        self.assertEqual(container["resources"]["memory"], "512Mi")
-
-        # Check environment variables
-        env_dict = {env["name"]: env["value"] for env in container["env"]}
-        self.assertEqual(env_dict["ENV"], "prod")
-
-        # Check scaling
-        autoscaling = spec["defaultOptions"]["autoscaling"]
-        self.assertEqual(autoscaling["minScale"], 2)
-        self.assertEqual(autoscaling["maxScale"], 2)
-
-    def test_update_no_parameters(self) -> None:
-        """Test update method with no parameters (should result in empty update)"""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        self.client.api.patch_workload.return_value = mock_response
-
-        with patch("builtins.print"):
-            self.workload.update()
-
-        # Should still call the API, but with empty update data
-        call_args = self.client.api.patch_workload.call_args
-        update_data = call_args[1]["data"]
-        self.assertEqual(update_data, {})
-        location: str = "test-location"
-        config = self.workload.config(location=location)
-
-        self.assertEqual(config.location, location)
-
-    def test_config_with_custom_gvc(self) -> None:
-        """Test config method with custom gvc parameter"""
-        custom_gvc: str = "custom-gvc"
-        config = self.workload.config(gvc=custom_gvc)
-
-        self.assertEqual(config.gvc, custom_gvc)
-
-    def test_clone_basic(self) -> None:
-        """Test clone method with basic parameters"""
-        # Setup test data
-        new_name: str = "cloned-workload"
-
-        # Mock successful API response
-        mock_response: Mock = Mock(spec=Response)
-        mock_response.status_code = 201
-        mock_response.text = "Created"
-        self.client.api.create_workload.return_value = mock_response
-
-        # Mock the API call for get_workload (used by export)
-        workload_data = {
-            "name": self.attrs["name"],
-            "spec": self.attrs["spec"],
-            "description": self.attrs["description"],
-        }
-        self.client.api.get_workload.return_value = workload_data
-
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
-            # Call clone method - should not raise any exceptions
-            self.workload.clone(name=new_name)
-
-        # Verify API call
-        self.client.api.create_workload.assert_called_once()
-
-        # Check that both arguments are passed as keyword arguments
-        args, kwargs = cast(
-            tuple[tuple[Any, ...], dict[str, Any]],
-            self.client.api.create_workload.call_args,
-        )
-        self.assertIn("config", kwargs)
-        self.assertIn("metadata", kwargs)
-
-        # Check metadata
-        metadata = kwargs["metadata"]
-        self.assertEqual(metadata["name"], new_name)
-        # Original spec should be preserved
-        self.assertEqual(metadata["spec"]["type"], self.attrs["spec"]["type"])
-
-        # Check container basics (the parser system adds optional fields with None values)
-        exported_container = metadata["spec"]["containers"][0]
-        original_container = self.attrs["spec"]["containers"][0]
-
-        # Verify essential container fields are preserved
-        self.assertEqual(exported_container["name"], original_container["name"])
-        self.assertEqual(exported_container["image"], original_container["image"])
-        self.assertEqual(exported_container["cpu"], original_container["cpu"])
-        self.assertEqual(exported_container["memory"], original_container["memory"])
-        self.assertEqual(
-            exported_container["inheritEnv"], original_container["inheritEnv"]
-        )
-        self.assertEqual(exported_container["ports"], original_container["ports"])
-
-    def test_clone_with_gvc(self) -> None:
-        """Test clone method with custom gvc"""
-        # Setup test data
-        new_name: str = "cloned-workload"
-        new_gvc: str = "new-gvc"
-
-        # Mock the export method
-        self.workload.export = MagicMock(
-            return_value={
-                "name": self.attrs["name"],
-                "gvc": self.state["gvc"],
-                "spec": self.attrs["spec"],
-            }
-        )
-
-        # Mock successful API response
-        mock_response: Mock = Mock(spec=Response)
-        mock_response.status_code = 201
-        mock_response.text = "Created"
-        self.client.api.create_workload.return_value = mock_response
-
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
-            # Call clone method
-            self.workload.clone(name=new_name, gvc=new_gvc)
-
-        # Verify API call
-        args, kwargs = cast(
-            tuple[tuple[Any, ...], dict[str, Any]],
-            self.client.api.create_workload.call_args,
-        )
-
-        # Check that both arguments are passed as keyword arguments
-        self.assertIn("config", kwargs)
-        self.assertIn("metadata", kwargs)
-
-        # Check config has new gvc
-        self.assertEqual(kwargs["config"].gvc, new_gvc)
-
-        # Check metadata has new gvc
-        metadata = kwargs["metadata"]
-        self.assertEqual(metadata["gvc"], new_gvc)
-
-    def test_clone_with_type_change(self) -> None:
-        """Test clone method with workload type change"""
-        # Setup test data
-        new_name: str = "cloned-workload"
-        new_type: str = "serverless"  # Change from standard to serverless
-
-        # Mock the API call for get_workload (used by export)
-        workload_data = {
-            "name": self.attrs["name"],
-            "spec": self.attrs["spec"],
-            "description": self.attrs["description"],
-        }
-        self.client.api.get_workload.return_value = workload_data
-
-        # Mock successful API response
-        mock_response: Mock = Mock(spec=Response)
-        mock_response.status_code = 201
-        mock_response.text = "Created"
-        self.client.api.create_workload.return_value = mock_response
-
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
-            # Call clone method
-            self.workload.clone(name=new_name, workload_type=new_type)
-
-        # Verify API call
-        _, kwargs = cast(
-            tuple[tuple[Any, ...], dict[str, Any]],
-            self.client.api.create_workload.call_args,
-        )
-
-        # Check metadata has new type
-        metadata = kwargs["metadata"]
-        self.assertEqual(metadata["spec"]["type"], new_type)
-
-        # Check that autoscaling and capacityAI were updated for serverless type
-        self.assertEqual(
-            metadata["spec"]["defaultOptions"]["autoscaling"]["metric"], "cpu"
-        )
-        self.assertFalse(metadata["spec"]["defaultOptions"]["capacityAI"])
-
-    def test_clone_error(self) -> None:
-        """Test clone method with API error"""
-        # Setup test data
-        new_name: str = "cloned-workload"
-
-        # Mock the export method
-        self.workload.export = MagicMock(
-            return_value={
-                "name": self.attrs["name"],
-                "gvc": self.state["gvc"],
-                "spec": self.attrs["spec"],
-            }
-        )
-
-        # Mock error API response
-        mock_response: Mock = Mock(spec=Response)
-        mock_response.status_code = 400
-        mock_response.json.return_value = {"error": "Bad request"}
-        mock_response.text = "Bad request"
-        self.client.api.create_workload.return_value = mock_response
-
-        # Mock print to avoid output during test
-        with (
-            patch("builtins.print"),
-            self.assertRaises((RuntimeError, ValueError)),
-        ):
-            self.workload.clone(name=new_name)
-
-        # Verify API call was attempted
-        self.client.api.create_workload.assert_called_once()
-
-    # @patch("cpln.models.containers.ContainerParser.parse_deployment_containers")
-    # def test_get_container_objects(self, mock_parse: MagicMock) -> None:
-    #     """Test get_container_objects method"""
-    #     # Setup test data
-    #     location = "aws-us-east-1"
-    #     mock_containers = [
-    #         Container(
-    #             name="app-container",
-    #             image="nginx:latest",
-    #             workload_name=self.attrs["name"],
-    #             gvc_name=self.state["gvc"],
-    #             location=location,
-    #         )
-    #     ]
-
-    #     # Mock the parser to return containers
-    #     mock_parse.return_value = mock_containers
-
-    #     # Mock API responses
-    #     self.client.api.get_workload_deployment.return_value = {
-    #         "status": {"versions": []}
-    #     }
-
-    #     # Call method
-    #     result = self.workload.get_container_objects(location=location)
-
-    #     # Verify result
-    #     self.assertEqual(result, mock_containers)
-    #     self.assertEqual(len(result), 1)
-    #     self.assertEqual(result[0].name, "app-container")
-
-    #     # Verify API call
-    #     self.client.api.get_workload_deployment.assert_called_once()
-
-    #     # Verify parser was called
-    #     mock_parse.assert_called_once()
-
-    # @patch("cpln.models.containers.ContainerParser.parse_deployment_containers")
-    # def test_get_container_objects_no_location(self, mock_parse: MagicMock) -> None:
-    #     """Test get_container_objects method without location (uses all locations)"""
-    #     # Setup test data
-    #     mock_containers = [
-    #         Container(
-    #             name="app-container",
-    #             image="nginx:latest",
-    #             workload_name=self.attrs["name"],
-    #             gvc_name=self.state["gvc"],
-    #             location="aws-us-east-1",
-    #         )
-    #     ]
-
-    #     # Mock the parser to return containers
-    #     mock_parse.return_value = mock_containers
-
-    #     # Mock API responses
-    #     self.client.api.get_workload_deployment.return_value = {
-    #         "status": {"versions": []}
-    #     }
-
-    #     # Call method without location
-    #     result = self.workload.get_container_objects()
-
-    #     # Should try multiple locations (due to location inference)
-    #     self.assertIsInstance(result, list)
-
-    #     # Verify API calls were made (potentially multiple for different locations)
-    #     self.assertTrue(self.client.api.get_workload_deployment.called)
-
-    # def test_get_container_not_found(self) -> None:
-    #     """Test get_container method when container is not found"""
-    #     # Setup test data
-    #     container_name = "non-existent-container"
-    #     mock_containers = [
-    #         Container(
-    #             name="app-container",
-    #             image="nginx:latest",
-    #             workload_name=self.attrs["name"],
-    #             gvc_name=self.state["gvc"],
-    #             location="aws-us-east-1",
-    #         )
-    #     ]
-
-    #     # Mock get_container_objects to return containers
-    #     with patch.object(
-    #         self.workload, "get_container_objects", return_value=mock_containers
-    #     ):
-    #         # Call method
-    #         result = self.workload.get_container(container_name)
-
-    #         # Verify result
-    #         self.assertIsNone(result)
-
-
-class TestWorkloadCollection(unittest.TestCase):
-    """Tests for the WorkloadCollection class"""
-
-    def setUp(self) -> None:
-        """Set up the test"""
-        self.client: MagicMock = MagicMock()
-        self.collection = WorkloadCollection(client=self.client)
-
-    def test_model_attribute(self) -> None:
-        """Test the model attribute is set correctly"""
-        self.assertEqual(self.collection.model, Workload)
-
-    def test_get_workload(self) -> None:
-        """Test get method to retrieve a specific workload"""
-        # Setup test data
-        config: WorkloadConfig = WorkloadConfig(
-            gvc="test-gvc", workload_id="test-workload"
-        )
-        workload_data: dict[str, Any] = {
-            "name": "test-workload",
-            "spec": {"type": "standard"},
-        }
-
-        # Mock API response
-        self.client.api.get_workload.return_value = workload_data
-
-        # Call get method
-        result = self.collection.get(config)
-
-        # Verify API call
-        self.client.api.get_workload.assert_called_once_with(config=config)
-
-        # Verify result
-        self.assertIsInstance(result, Workload)
-        self.assertEqual(result.attrs, workload_data)
-        self.assertEqual(result.state["gvc"], config.gvc)
-
-    def test_list_with_gvc(self) -> None:
-        """Test list method with gvc parameter"""
-        # Setup test data
-        gvc: str = "test-gvc"
-        workloads: list[dict[str, Any]] = [
-            {"name": "workload1", "spec": {"type": "standard"}},
-            {"name": "workload2", "spec": {"type": "serverless"}},
-        ]
-
-        # Mock API responses
-        self.client.api.get_workload.side_effect = [
-            {"items": workloads},  # First call returns list
-            workloads[0],  # Second call returns workload1
-            workloads[1],  # Third call returns workload2
-        ]
-
-        # Call list method
-        result = self.collection.list(gvc=gvc)
-
-        # Verify result structure
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 2)
-
-        # Verify result contents
-        self.assertIsInstance(result[0], Workload)
-        self.assertEqual(result[0].attrs, workloads[0])
-        self.assertEqual(result[0].state["gvc"], gvc)
-
-        self.assertIsInstance(result[1], Workload)
-        self.assertEqual(result[1].attrs, workloads[1])
-        self.assertEqual(result[1].state["gvc"], gvc)
-
-        # Verify API calls
-        self.assertEqual(self.client.api.get_workload.call_count, 3)
-
-    def test_list_with_config(self) -> None:
-        """Test list method with config parameter"""
-        # Setup test data
-        config: WorkloadConfig = WorkloadConfig(gvc="test-gvc")
-        workloads: list[dict[str, Any]] = [
-            {"name": "workload1", "spec": {"type": "standard"}},
-            {"name": "workload2", "spec": {"type": "serverless"}},
-        ]
-
-        # Mock API responses
-        self.client.api.get_workload.side_effect = [
-            {"items": workloads},  # First call returns list
-            workloads[0],  # Second call returns workload1
-            workloads[1],  # Third call returns workload2
-        ]
-
-        # Call list method
-        result = self.collection.list(config=config)
-
-        # Verify result structure
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 2)
-
-        # Verify API calls
-        self.assertEqual(self.client.api.get_workload.call_count, 3)
-
-        # Check first call was with the original config
-        first_call = self.client.api.get_workload.call_args_list[0]
-
-        # The config might be passed as a positional or keyword argument
-        # Try keyword first
-        if "config" in first_call[1]:
-            self.assertEqual(first_call[1]["config"], config)
-        else:
-            # If not a keyword, check if it was passed as a positional argument
-            self.assertEqual(first_call[0][0], config)
-
-    def test_list_no_args(self) -> None:
-        """Test list method with no arguments"""
-        with self.assertRaises(ValueError):
-            self.collection.list()
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
 
     @patch("cpln.models.workloads.get_default_workload_template")
-    def test_create_standard(self, mock_template: Mock) -> None:
-        """Test create method with standard workload type"""
-        # Setup test data
-        name: str = "test-standard-workload"
-        gvc: str = "test-gvc"
-        description: str = "Standard workload description"
-        image: str = "nginx:latest"
-        container_name: str = "app"
-        workload_type: str = "standard"
+    def test_clone_operation_creates_new_workload_with_correct_name(
+        self, mock_get_template
+    ):
+        """Test that clone() creates new workload with specified name"""
+        # Arrange
+        mock_template = {"kind": "workload", "spec": {"type": "serverless"}}
+        mock_get_template.return_value = mock_template
 
-        # Mock template
-        template: dict[str, Any] = {
-            "name": "",
-            "description": "",
+        with patch.object(self.workload, "export") as mock_export:
+            mock_export.return_value = self.test_attrs
+
+            # Act
+            self.workload.clone(name="cloned-workload", gvc="target-gvc")
+
+            # Assert
+            self.mock_client.api.create_workload.assert_called_once()
+            # Verify the call was made with correct parameters
+            call_args = self.mock_client.api.create_workload.call_args[0]
+            self.assertIn("cloned-workload", str(call_args))
+
+    def test_export_operation_returns_workload_metadata_copy(self):
+        """Test that export() returns a deep copy of workload attributes"""
+        # Act
+        result = self.workload.export()
+
+        # Assert
+        self.assertEqual(result, self.test_attrs)
+        # Verify it's a copy, not the same object
+        self.assertIsNot(result, self.test_attrs)
+        # Verify nested objects are also copied
+        self.assertIsNot(result["spec"], self.test_attrs["spec"])
+
+
+class TestWorkloadCollectionInitialization(unittest.TestCase):
+    """Test WorkloadCollection initialization and basic properties"""
+
+    def test_workload_collection_initialization_with_client_sets_client(self):
+        """Test that WorkloadCollection initializes correctly with client"""
+        # Arrange
+        test_client = MagicMock()
+
+        # Act
+        collection = WorkloadCollection(client=test_client)
+
+        # Assert
+        self.assertEqual(collection.client, test_client)
+        self.assertEqual(collection.model, Workload)
+
+    def test_workload_collection_model_attribute_is_workload_class(self):
+        """Test that collection.model points to Workload class"""
+        # Act
+        collection = WorkloadCollection()
+
+        # Assert
+        self.assertIs(collection.model, Workload)
+
+
+class TestWorkloadCollectionOperations(unittest.TestCase):
+    """Test WorkloadCollection operations"""
+
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.mock_client = MagicMock()
+        self.collection = WorkloadCollection(client=self.mock_client)
+
+    def test_get_operation_returns_workload_instance_with_correct_attributes(self):
+        """Test that get() returns Workload instance with data from API"""
+        # Arrange
+        test_config = WorkloadConfig(gvc="test-gvc", workload_id="test-workload")
+        api_response = {
+            "name": "test-workload",
+            "id": "wl-test-123",
             "spec": {
-                "containers": [{"name": "", "image": ""}],
-                "type": "standard",
-                "defaultOptions": {
-                    "autoscaling": {"metric": "memory"},
-                    "capacityAI": True,
-                },
+                "containers": [
+                    {
+                        "name": "app",
+                        "image": "nginx:latest",
+                        "cpu": "100m",
+                        "memory": 256,
+                    }
+                ]
             },
+            "status": "active",
         }
-        mock_template.return_value = template
+        self.mock_client.api.get_workload.return_value = api_response
 
-        # Mock successful API response
-        mock_response: Mock = Mock(spec=Response)
-        mock_response.status_code = 201
-        mock_response.text = "Created"
-        self.client.api.create_workload.return_value = mock_response
+        # Act
+        result = self.collection.get(test_config)
 
-        # Mock print to avoid output during test
-        with patch("builtins.print"):
-            # Call create method
+        # Assert
+        self.assertIsInstance(result, Workload)
+        self.assertEqual(result.attrs, api_response)
+        self.assertEqual(result.client, self.mock_client)
+        self.assertEqual(result.collection, self.collection)
+
+    def test_list_operation_returns_list_of_workload_instances(self):
+        """Test that list() returns list of Workload instances from API response"""
+        # Arrange
+        api_response = {
+            "items": [
+                {"name": "workload1", "id": "wl-1", "spec": {"type": "standard"}},
+                {"name": "workload2", "id": "wl-2", "spec": {"type": "serverless"}},
+            ]
+        }
+        self.mock_client.api.get_workload.return_value = api_response
+
+        # Act
+        result = self.collection.list()
+
+        # Assert
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+
+        # Verify each item is a properly configured Workload instance
+        for i, workload in enumerate(result):
+            with self.subTest(workload_index=i):
+                self.assertIsInstance(workload, Workload)
+                self.assertEqual(workload.attrs, api_response["items"][i])
+                self.assertEqual(workload.client, self.mock_client)
+                self.assertEqual(workload.collection, self.collection)
+
+    def test_create_operation_with_template_creates_workload_correctly(self):
+        """Test that create() operation creates workload using template"""
+        # Arrange
+        workload_config = MagicMock(spec=WorkloadConfig)
+        workload_config.workload = "new-workload"
+        workload_config.gvc = "test-gvc"
+
+        with patch(
+            "cpln.models.workloads.get_default_workload_template"
+        ) as mock_get_template:
+            mock_template = {"kind": "workload", "spec": {"type": "standard"}}
+            mock_get_template.return_value = mock_template
+
+            # Act
             self.collection.create(
-                name=name,
-                gvc=gvc,
-                description=description,
-                image=image,
-                container_name=container_name,
-                workload_type=workload_type,
+                name="new-workload", config=workload_config, workload_type="standard"
             )
 
-        # Verify template was requested
-        mock_template.assert_called_once_with(workload_type)
+            # Assert
+            mock_get_template.assert_called_once_with("standard")
+            self.mock_client.api.create_workload.assert_called_once()
 
-        # Verify API call
-        self.client.api.create_workload.assert_called_once()
 
-        # Check that both arguments are being passed
-        # They may be passed as positional or keyword arguments
-        args, kwargs = cast(
-            tuple[tuple[Any, ...], dict[str, Any]],
-            self.client.api.create_workload.call_args,
-        )
+class TestWorkloadErrorHandling(unittest.TestCase):
+    """Test Workload error handling and edge cases"""
 
-        if args and len(args) >= 1:
-            # If passed as positional args
-            self.assertEqual(args[0].gvc, gvc)
-            if len(args) >= 2:
-                metadata = args[1]
-            else:
-                self.assertIn("metadata", kwargs)
-                metadata = kwargs["metadata"]
-        else:
-            # If passed as keyword args
-            self.assertIn("config", kwargs)
-            self.assertEqual(kwargs["config"].gvc, gvc)
-            self.assertIn("metadata", kwargs)
-            metadata = kwargs["metadata"]
+    def setUp(self):
+        """Set up common test fixtures"""
+        self.test_attrs = {"name": "error-test", "spec": {"type": "standard"}}
+        self.mock_client = MagicMock()
+        self.workload = Workload(attrs=self.test_attrs, client=self.mock_client)
 
-        # Verify metadata content
-        self.assertEqual(metadata["name"], name)
-        self.assertEqual(metadata["description"], description)
-        self.assertEqual(metadata["spec"]["containers"][0]["image"], image)
-        self.assertEqual(metadata["spec"]["containers"][0]["name"], container_name)
+    def test_get_operation_propagates_api_errors(self):
+        """Test that get() operation propagates API client errors"""
+        # Arrange
+        api_error = Exception("Workload API connection failed")
+        self.mock_client.api.get_workload.side_effect = api_error
 
-    def test_create_missing_params(self) -> None:
-        """Test create method with missing required parameters"""
-        # Missing image
-        with self.assertRaises(ValueError) as cm:
-            self.collection.create(
-                name="test-workload", gvc="test-gvc", container_name="app"
-            )
-        self.assertEqual(str(cm.exception), "Image is required.")
+        with patch.object(self.workload, "config") as mock_config:
+            mock_config.return_value = MagicMock()
 
-        # Missing container_name
-        with self.assertRaises(ValueError) as cm:
-            self.collection.create(
-                name="test-workload", gvc="test-gvc", image="nginx:latest"
-            )
-        self.assertEqual(str(cm.exception), "Container name is required.")
+            # Act & Assert
+            with self.assertRaises(Exception) as context:
+                self.workload.get()
 
-        # No gvc or config provided
-        with self.assertRaises(ValueError) as cm:
-            self.collection.create(
-                name="test-workload", image="nginx:latest", container_name="app"
-            )
-        self.assertEqual(
-            str(cm.exception), "Either GVC or WorkloadConfig must be defined."
-        )
+            self.assertEqual(context.exception, api_error)
+
+    def test_get_spec_with_missing_spec_raises_key_error(self):
+        """Test that get_spec() raises KeyError when spec is missing"""
+        # Arrange
+        workload_no_spec = Workload(attrs={"name": "no-spec"})
+
+        # Act & Assert
+        with self.assertRaises(KeyError):
+            workload_no_spec.get_spec()
+
+    def test_get_container_with_missing_containers_returns_none(self):
+        """Test that get_container() returns None when containers are missing"""
+        # Arrange
+        workload_no_containers = Workload(attrs={"name": "no-containers", "spec": {}})
+
+        # Act
+        result = workload_no_containers.get_container("any-name")
+
+        # Assert
+        self.assertIsNone(result)
+
+    @patch("cpln.models.workloads.Deployment")
+    def test_exec_operation_with_websocket_error_raises_websocket_exit_code_error(
+        self, mock_deployment_class
+    ):
+        """Test that exec() properly handles WebSocket errors"""
+        # Arrange
+        mock_deployment = MagicMock(spec=Deployment)
+        websocket_error = WebSocketExitCodeError("Command failed with exit code 1")
+        mock_deployment.exec.side_effect = websocket_error
+
+        with patch.object(self.workload, "get_deployment") as mock_get_deployment:
+            mock_get_deployment.return_value = mock_deployment
+
+            # Act & Assert
+            with self.assertRaises(WebSocketExitCodeError) as context:
+                self.workload.exec("failing-command", location="us-east-1")
+
+            self.assertEqual(context.exception, websocket_error)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main()  # type: ignore

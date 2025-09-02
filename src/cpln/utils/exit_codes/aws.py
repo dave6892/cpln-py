@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 
 class AwsExitCode(Enum):
@@ -17,7 +17,7 @@ class AwsExitCode(Enum):
     @classmethod
     def get_message(cls, code: int) -> str:
         """Get the human-readable message for an exit code."""
-        messages: Dict[int, str] = {
+        messages: dict[int, str] = {
             cls.SUCCESS.value: "The command was successful. There were no errors thrown by either the CLI or by the service that the request was made to.",
             cls.CONFIG_ERROR.value: "The configuration file parsed to the CLI was not found or might be corrupt.",
             cls.PARSE_ERROR.value: "The command entered on the command line failed to be parsed. Parsing failures can be caused by, but are not limited to, missing any required subcommands or arguments or using any unknown commands or arguments.",
@@ -37,7 +37,7 @@ class AwsExitCode(Enum):
     @classmethod
     def get_error_type(cls, code: int) -> Optional[str]:
         """Get the type of error for an exit code."""
-        error_types: Dict[int, str] = {
+        error_types: dict[int, str] = {
             cls.CONFIG_ERROR.value: "Configuration Error",
             cls.PARSE_ERROR.value: "Parse Error",
             cls.SIGINT.value: "Interrupted",

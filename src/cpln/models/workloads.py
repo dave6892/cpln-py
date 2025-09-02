@@ -141,7 +141,7 @@ class Workload(Model):
 
         This will stop the workload from running while preserving its configuration.
         """
-        self._change_suspend_state(state=True)
+        self._change_suspend_state(True)
 
     def unsuspend(self) -> None:
         """
@@ -149,7 +149,7 @@ class Workload(Model):
 
         This will resume the workload from a suspended state.
         """
-        self._change_suspend_state(state=False)
+        self._change_suspend_state(False)
 
     def exec(
         self,
@@ -236,7 +236,7 @@ class Workload(Model):
 
         return {
             "name": self.name,
-            "gvc": self.state["gvc"],
+            "gvc": self.state.get("gvc"),
             "spec": convert_dictionary_keys(
                 self.get_spec().to_dict(),
                 lambda x: inflection.camelize(x, False),
@@ -260,7 +260,7 @@ class Workload(Model):
             (WorkloadConfig): The workload config.
         """
         return WorkloadConfig(
-            gvc=self.state["gvc"] if gvc is None else gvc,
+            gvc=self.state.get("gvc") if gvc is None else gvc,
             workload_id=self.attrs["name"],
             location=location,
         )
@@ -484,12 +484,28 @@ class Workload(Model):
         """
         import re
 
-        # Match patterns like "128Mi", "1Gi", "500M", "2G"
-        memory_pattern = r"^(\d+(\.\d+)?)(Mi|Gi|M|G|Ki|K|Ti|T)?$"
+        # Memory should be positive integers only with optional units
+        # Valid: "128", "256Mi", "1Gi", "500M", "2G"
+        # Invalid: "1.5", "0", "-256", "invalid", ""
+        if not memory or memory == "0":
+            raise ValueError(
+                f"Invalid memory specification '{memory}'. "
+                "Memory must be a positive integer with optional unit (e.g., '128', '256Mi', '1Gi', '500M')"
+            )
+
+        # Check for negative numbers or decimals
+        if memory.startswith("-") or "." in memory:
+            raise ValueError(
+                f"Invalid memory specification '{memory}'. "
+                "Memory must be a positive integer with optional unit (e.g., '128', '256Mi', '1Gi', '500M')"
+            )
+
+        # Match positive integers with optional memory units
+        memory_pattern = r"^([1-9]\d*)(Mi|Gi|M|G|Ki|K|Ti|T)?$"
         if not re.match(memory_pattern, memory):
             raise ValueError(
                 f"Invalid memory specification '{memory}'. "
-                "Expected format: number followed by unit (e.g., '128Mi', '1Gi', '500M')"
+                "Memory must be a positive integer with optional unit (e.g., '128', '256Mi', '1Gi', '500M')"
             )
 
     def _build_update_from_parameters(

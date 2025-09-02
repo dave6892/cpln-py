@@ -104,8 +104,8 @@ class Spec(BaseParser):
         support_dynamic_tags (bool): Whether dynamic tags are supported
     """
 
-    type: str
     containers: list[Container]
+    type: str = "serverless"
     identity_link: Optional[str] = None
     load_balancer: Optional[LoadBalancer] = None
     default_options: Optional[DefaultOptions] = None

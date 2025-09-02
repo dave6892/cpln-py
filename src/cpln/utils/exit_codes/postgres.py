@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 
 class PostgresExitCode(Enum):
@@ -23,7 +23,7 @@ class PostgresExitCode(Enum):
             code (int): The exit code to get the message for
             command (str): The name of the PostgreSQL command (e.g., 'pg_dump', 'pg_restore')
         """
-        messages: Dict[int, str] = {
+        messages: dict[int, str] = {
             cls.SUCCESS.value: f"The {command} completed successfully.",
             cls.GENERAL_ERROR.value: f"An error occurred while executing {command}. This could be due to invalid command-line arguments, internal errors, or other issues.",
             cls.INVALID_ARGUMENTS.value: f"Invalid command-line arguments were provided to {command}.",
@@ -43,7 +43,7 @@ class PostgresExitCode(Enum):
     @classmethod
     def get_error_type(cls, code: int) -> Optional[str]:
         """Get the type of error for an exit code."""
-        error_types: Dict[int, str] = {
+        error_types: dict[int, str] = {
             cls.GENERAL_ERROR.value: "General Error",
             cls.INVALID_ARGUMENTS.value: "Invalid Arguments",
             cls.CONNECTION_ERROR.value: "Connection Error",
